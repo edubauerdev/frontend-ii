@@ -4,9 +4,10 @@ import type React from "react"
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Send, RefreshCw, Zap, Loader2, Paperclip, X, User, History, UserPlus } from "lucide-react"
+import { Send, RefreshCw, Zap, Loader2, Paperclip, X, User, History, UserPlus, Plus, Tag, Pencil, Tags } from "lucide-react"
 import { QuickRepliesPanel } from "./quick-replies-panel"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu"
 import { MessageBubble } from "./message-bubble"
 import { toast } from "sonner"
 import type { Message, ChatAssignmentDB, ChatActivity } from "@/lib/whatsapp-types"
@@ -20,6 +21,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { getRoleColor } from "@/lib/role-colors"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription"
+import { EditChatNameDialog } from "./edit-chat-name-dialog"
+import { TagSelector } from "./tag-selector"
+import { ChatEtiquetasDialog } from "./chat-etiquetas-dialog"
+import type { Etiqueta, EtiquetaSimple } from "@/lib/whatsapp-types"
 
 const MESSAGES_PER_PAGE = 20
 const SCROLL_THRESHOLD = 100
@@ -31,6 +36,7 @@ interface ChatWindowProps {
   chatId: string
   chatName?: string | null
   chatPicture?: string | null
+  chatEtiquetas?: EtiquetaSimple[]
   onRefresh: () => void
   onToggleLeadPanel: (show: boolean) => void
   showLeadPanel: boolean
@@ -38,8 +44,9 @@ interface ChatWindowProps {
 
 export function ChatWindow({
   chatId,
-  chatName,
+  chatName: initialChatName,
   chatPicture = null,
+  chatEtiquetas: initialEtiquetas = [],
   onRefresh,
   onToggleLeadPanel,
   showLeadPanel,
@@ -60,8 +67,14 @@ export function ChatWindow({
   const [showHistoryDialog, setShowHistoryDialog] = useState(false)
   const [hasAssignmentHistory, setHasAssignmentHistory] = useState(false)
   const [showAssignToUserDialog, setShowAssignToUserDialog] = useState(false)
+  const [showEditNameDialog, setShowEditNameDialog] = useState(false)
+  const [showEtiquetasDialog, setShowEtiquetasDialog] = useState(false)
   const [roleColor, setRoleColor] = useState<string | null>(null)
   const userDataCache = useRef<Record<string, { nome: string | null; cargo: string | null; color: string | null }>>({})
+
+  // Estados locais para nome e etiquetas (atualizados via realtime)
+  const [chatName, setChatName] = useState<string | null>(initialChatName || null)
+  const [chatEtiquetas, setChatEtiquetas] = useState<EtiquetaSimple[]>(initialEtiquetas)
 
   const userId = getCookie("auth_user_id")
 
@@ -143,6 +156,58 @@ export function ChatWindow({
     },
   })
 
+  // Realtime para atualização de nome e etiquetas do chat
+  useEffect(() => {
+    const channel = supabase
+      .channel(`chat:${chatId}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'chats',
+        filter: `id=eq.${chatId}`
+      }, async (payload) => {
+        const updatedChat = payload.new as any;
+        
+        // Atualiza o nome
+        if (updatedChat.name) {
+          setChatName(updatedChat.name);
+        }
+        
+        // Usa o array etiqueta_ids diretamente
+        const etiquetaIds: string[] = updatedChat.etiqueta_ids || [];
+
+        if (etiquetaIds.length > 0) {
+          const { data: etiquetasData } = await supabase
+            .from('whatsapp_etiquetas')
+            .select('id, nome, cor, descricao')
+            .in('id', etiquetaIds);
+          
+          if (etiquetasData) {
+            const etiquetas = etiquetaIds
+              .map(id => etiquetasData.find(e => e.id === id))
+              .filter(Boolean) as EtiquetaSimple[];
+            setChatEtiquetas(etiquetas);
+          }
+        } else {
+          setChatEtiquetas([]);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [chatId, supabase]);
+
+  // Atualiza estados quando props mudam
+  useEffect(() => {
+    setChatName(initialChatName || null);
+  }, [initialChatName]);
+
+  useEffect(() => {
+    setChatEtiquetas(initialEtiquetas);
+  }, [initialEtiquetas]);
+
   const handleAssignmentUpdate = async (assignment: any) => {
       if (assignment.status === "active") {
         setAssignment(assignment)
@@ -172,6 +237,13 @@ export function ChatWindow({
   // ----------------------------------------------------
 
   useEffect(() => {
+    // 🔥 CORREÇÃO: Limpa a atribuição anterior ANTES de carregar a nova
+    setAssignment(null)
+    setAssignedUserName(null)
+    setAssignedUserCargo(null)
+    setRoleColor(null)
+    setHasAssignmentHistory(false)
+    
     loadAssignment()
     loadActivities()
     checkAssignmentHistory()
@@ -445,11 +517,142 @@ export function ChatWindow({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold truncate">{safeChatName}</h3>
+                {chatName && chatName.trim() ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setShowEditNameDialog(true)}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Editar nome</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : null}
+                
+                {/* Badge de atribuição com context menu */}
                 {assignedUserName && roleColor && (
-                  <Badge variant="secondary" className="text-xs flex items-center gap-1 border-2" style={{ backgroundColor: roleColor, color: "#ffffff", borderColor: roleColor }}>
-                    <User className="w-3 h-3" />
-                    {assignedUserName}
-                  </Badge>
+                  <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                      <div>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="secondary" className="text-xs flex items-center gap-1 border-2 cursor-context-menu" style={{ backgroundColor: roleColor, color: "#ffffff", borderColor: roleColor }}>
+                                <User className="w-3 h-3" />
+                                {assignedUserName}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Atribuição</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="w-48">
+                      <ContextMenuItem
+                        onClick={async () => {
+                          try {
+                            if (assignment?.id) {
+                              const res = await fetch("/api/whatsapp/assignment", {
+                                method: "DELETE",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ assignmentId: assignment.id, chatId })
+                              })
+                              
+                              if (res.ok) {
+                                toast.success("Atribuição removida")
+                                onRefresh()
+                              }
+                            }
+                          } catch {
+                            toast.error("Erro ao remover atribuição")
+                          }
+                        }}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Remover atribuição
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
+                )}
+                
+                {/* Exibe múltiplas etiquetas com context menu */}
+                {chatEtiquetas && chatEtiquetas.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    {chatEtiquetas.slice(0, 3).map((etiqueta) => (
+                      <ContextMenu key={etiqueta.id}>
+                        <ContextMenuTrigger asChild>
+                          <div>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs flex items-center gap-1 border text-white cursor-context-menu"
+                                    style={{ backgroundColor: etiqueta.cor, borderColor: etiqueta.cor }}
+                                  >
+                                    {etiqueta.nome}
+                                    <Tag className="w-3 h-3" />
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{etiqueta.descricao || etiqueta.nome}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent className="w-48">
+                          <ContextMenuItem
+                            onClick={async () => {
+                              try {
+                                const res = await fetch("/api/whatsapp/assign-tag", {
+                                  method: "DELETE",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ chatId, etiquetaId: etiqueta.id })
+                                })
+                                if (res.ok) {
+                                  toast.success("Etiqueta removida")
+                                  setChatEtiquetas(prev => prev.filter(e => e.id !== etiqueta.id))
+                                  onRefresh()
+                                }
+                              } catch {
+                                toast.error("Erro ao remover etiqueta")
+                              }
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <X className="w-4 h-4 mr-2" />
+                            Remover essa etiqueta
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem onClick={() => setShowEtiquetasDialog(true)}>
+                            <Tags className="w-4 h-4 mr-2" />
+                            Ver todas etiquetas
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    ))}
+                    {chatEtiquetas.length > 3 && (
+                      <Badge 
+                        variant="secondary" 
+                        className="text-xs cursor-pointer hover:bg-secondary/80"
+                        onClick={() => setShowEtiquetasDialog(true)}
+                      >
+                        +{chatEtiquetas.length - 3}
+                      </Badge>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -460,7 +663,25 @@ export function ChatWindow({
                     <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" onClick={() => setShowHistoryDialog(true)}><History className="w-4 h-4" /></Button></TooltipTrigger><TooltipContent><p>Histórico</p></TooltipContent></Tooltip>
                  )}
                  <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" onClick={() => setShowAssignToUserDialog(true)}><User className="w-4 h-4 mr-2" /> Atribuir</Button></TooltipTrigger><TooltipContent><p>Atribuir</p></TooltipContent></Tooltip>
+                 {!chatName || !chatName.trim() ? (
+                   <Tooltip>
+                     <TooltipTrigger asChild>
+                       <Button variant="outline" size="sm" onClick={() => setShowEditNameDialog(true)}>
+                         <Plus className="w-4 h-4 mr-2" /> Adicionar Nome
+                       </Button>
+                     </TooltipTrigger>
+                     <TooltipContent><p>Adicionar nome ao contato</p></TooltipContent>
+                   </Tooltip>
+                 ) : null}
                  <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" onClick={() => onToggleLeadPanel(!showLeadPanel)}><UserPlus className="w-4 h-4 mr-2" /> Novo Lead</Button></TooltipTrigger><TooltipContent><p>Criar Lead</p></TooltipContent></Tooltip>
+                 <Tooltip>
+                   <TooltipTrigger asChild>
+                     <div>
+                       <TagSelector chatId={chatId} currentEtiquetaId={chatEtiquetas?.[0]?.id || null} onTagAssigned={onRefresh} />
+                     </div>
+                   </TooltipTrigger>
+                   <TooltipContent><p>Adicionar etiqueta</p></TooltipContent>
+                 </Tooltip>
                  <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="w-4 h-4" /></Button></TooltipTrigger><TooltipContent><p>Atualizar</p></TooltipContent></Tooltip>
              </TooltipProvider>
           </div>
@@ -544,6 +765,24 @@ export function ChatWindow({
         currentAssignment={assignment}
         chatAssignment={assignment}
         onAssignSuccess={loadAssignment}
+      />
+
+      <EditChatNameDialog
+        open={showEditNameDialog}
+        onOpenChange={setShowEditNameDialog}
+        chatId={chatId}
+        currentName={chatName || chatId}
+        onSuccess={onRefresh}
+      />
+
+      <ChatEtiquetasDialog
+        open={showEtiquetasDialog}
+        onOpenChange={setShowEtiquetasDialog}
+        chatId={chatId}
+        etiquetas={chatEtiquetas}
+        onEtiquetaRemoved={() => {
+          onRefresh()
+        }}
       />
     </div>
   )

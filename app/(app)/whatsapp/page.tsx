@@ -25,6 +25,7 @@ export default function WhatsAppPage() {
   const [isConnected, setIsConnected] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
   const [showLeadPanel, setShowLeadPanel] = useState(false)
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
   const chatListRef = useRef<any>(null)
   const supabase = createClient()
 
@@ -41,6 +42,7 @@ export default function WhatsAppPage() {
     setSelectedChatId(chat.id)
     const displayName = (chat as any).name ?? (chat as any).pushName ?? chat.id
     setSelectedChatName(displayName)
+    setSelectedChat(chat)
   }
 
   function handleRefreshChats() {
@@ -126,6 +128,7 @@ export default function WhatsAppPage() {
                 chatName={selectedChatName}
                 // 🔥 AQUI: Passamos a URL do proxy diretamente para o filho
                 chatPicture={`${BACKEND_URL}/chats/avatar/${selectedChatId}`}
+                chatEtiquetas={selectedChat?.etiquetas || []}
                 onRefresh={handleRefreshChats}
                 onToggleLeadPanel={setShowLeadPanel}
                 showLeadPanel={showLeadPanel}

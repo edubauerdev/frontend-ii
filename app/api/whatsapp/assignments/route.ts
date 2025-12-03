@@ -211,24 +211,50 @@ export async function DELETE(request: NextRequest) {
     const supabase = await createServerClient()
 
     const { searchParams } = new URL(request.url)
-    const chatId = searchParams.get("chatId")
+    const chatIdParam = searchParams.get("chatId")
+    
+    // Tenta ler do body também (para compatibilidade com POST/DELETE em JSON)
+    let body: any = {}
+    try {
+      body = await request.json()
+    } catch {
+      // Ignore parse errors
+    }
 
-    if (!chatId) {
+    const chatId = chatIdParam || body.chatId
+    const assignmentId = body.assignmentId
+
+    if (!chatId && !assignmentId) {
       return NextResponse.json(
         {
           success: false,
-          message: "chatId é obrigatório",
+          message: "chatId ou assignmentId é obrigatório",
         },
         { status: 400 },
       )
     }
 
-    const { data: activeAssignment } = await supabase
-      .from("chat_assignments")
-      .select("*")
-      .eq("chat_id", chatId)
-      .eq("status", "active")
-      .maybeSingle()
+    let activeAssignment = null
+
+    // Se assignmentId foi fornecido, busca por ID
+    if (assignmentId) {
+      const { data } = await supabase
+        .from("chat_assignments")
+        .select("*")
+        .eq("id", assignmentId)
+        .maybeSingle()
+      activeAssignment = data
+    } 
+    // Caso contrário, busca por chatId
+    else if (chatId) {
+      const { data } = await supabase
+        .from("chat_assignments")
+        .select("*")
+        .eq("chat_id", chatId)
+        .eq("status", "active")
+        .maybeSingle()
+      activeAssignment = data
+    }
 
     if (activeAssignment) {
       const { error } = await supabase
@@ -248,7 +274,7 @@ export async function DELETE(request: NextRequest) {
       }
 
       await supabase.from("assignment_logs").insert({
-        chat_id: chatId,
+        chat_id: activeAssignment.chat_id,
         chat_name: activeAssignment.chat_name,
         action: "released",
         from_user_id: activeAssignment.assigned_to_id,

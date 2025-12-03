@@ -4,7 +4,7 @@ import { useDraggable } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
 import type { Lead } from "@/types/crm"
 import { cn } from "@/lib/utils"
-import { Phone, MessageCircle, MapPin, FileText, RefreshCw, Users, MoreHorizontal, CheckCircle, XCircle } from 'lucide-react'
+import { Phone, MessageCircle, MapPin, FileText, RefreshCw, Users, MoreHorizontal, CheckCircle, XCircle, Eye, ArrowRightLeft, Trash2 } from 'lucide-react'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -204,6 +204,7 @@ export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, o
             onView?.()
           }}
         >
+          <Eye className="w-4 h-4 mr-2" />
           Ver dados
         </ContextMenuItem>
         {canEdit && (
@@ -214,6 +215,7 @@ export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, o
                 onMove?.()
               }}
             >
+              <ArrowRightLeft className="w-4 h-4 mr-2" />
               Mover lead
             </ContextMenuItem>
             {lead.status === "convertido" ? (
@@ -224,6 +226,7 @@ export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, o
                 }}
                 className="text-orange-600 focus:text-orange-600 focus:bg-orange-50"
               >
+                <XCircle className="w-4 h-4 mr-2" />
                 Desconverter
               </ContextMenuItem>
             ) : (
@@ -234,6 +237,7 @@ export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, o
                 }}
                 className="text-green-600 focus:text-green-600 focus:bg-green-50"
               >
+                <CheckCircle className="w-4 h-4 mr-2" />
                 Convertido
               </ContextMenuItem>
             )}
@@ -244,6 +248,7 @@ export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, o
               }}
               className="text-red-600 focus:text-red-600"
             >
+              <Trash2 className="w-4 h-4 mr-2" />
               Excluir
             </ContextMenuItem>
           </>

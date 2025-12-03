@@ -4,9 +4,10 @@ import type React from "react"
 import { useState, useEffect, useRef, useCallback, useMemo, forwardRef, type ElementRef } from "react" 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
-import { Search, AlertCircle, RefreshCw, Loader2, User } from "lucide-react"
+import { Search, AlertCircle, RefreshCw, Loader2, User, Tag, Pencil, UserPlus, X, Tags } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { Chat } from "@/lib/whatsapp-types"
+import type { Chat, EtiquetaSimple } from "@/lib/whatsapp-types"
+import { ChatEtiquetasDialog } from "./chat-etiquetas-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { useWhatsAppCache } from "@/contexts/whatsapp-cache-context"
@@ -18,12 +19,20 @@ import useSWR, { mutate, useSWRConfig } from "swr"
 import { ATTR_CACHE_KEY, CHAT_LIST_CACHE_KEY } from "@/lib/swr-config"
 import type { AtribuicoesMap } from "@/lib/swr-config"
 import { getCookie } from "@/lib/auth" 
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu"
+import { ChatFilterPanel, type ChatFilterRule } from "./chat-filter-panel"
+import { EditChatNameDialog } from "./edit-chat-name-dialog"
+import { TagSelector } from "./tag-selector"
+import { AssignToUserDialog } from "./assign-to-user-dialog"
+import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription" 
 
 interface ChatListProps {
   onSelectChat: (chat: Chat) => void
   selectedChatId: string | null
   refreshTrigger?: number
   initialData?: any
+  onRefresh?: () => void
 }
 
 // URL do Backend para imagens (Proxy)
@@ -36,7 +45,7 @@ const SCROLL_THRESHOLD = 100
 type ChatListHandle = ElementRef<"div">; 
 
 const ChatList = forwardRef<ChatListHandle, ChatListProps>(
-  ({ onSelectChat, selectedChatId, refreshTrigger, initialData }, ref) => { 
+  ({ onSelectChat, selectedChatId, refreshTrigger, initialData, onRefresh }, ref) => { 
     const { data: cachedChats = initialData?.chats || [] } = useSWR(CHAT_LIST_CACHE_KEY)
     const { data: assignmentsMap = initialData?.assignmentsMap || {} } = useSWR<AtribuicoesMap>(ATTR_CACHE_KEY)
     
@@ -59,6 +68,17 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
     const [hasMore, setHasMore] = useState(true)
     
     const [offset, setOffset] = useState(0)
+
+    // Estados para filtros avançados
+    const [advancedFilters, setAdvancedFilters] = useState<ChatFilterRule[]>([])
+
+    // Estados para dialogs do context menu
+    const [contextMenuChat, setContextMenuChat] = useState<Chat | null>(null)
+    const [showEditNameDialog, setShowEditNameDialog] = useState(false)
+    const [showAssignDialog, setShowAssignDialog] = useState(false)
+    const [showTagSelector, setShowTagSelector] = useState(false)
+    const [showEtiquetasDialog, setShowEtiquetasDialog] = useState(false)
+    const [contextMenuEtiqueta, setContextMenuEtiqueta] = useState<EtiquetaSimple | null>(null)
 
     const scrollContainerRef = (ref as React.RefObject<HTMLDivElement>) || useRef<HTMLDivElement>(null); 
     const isLoadingRef = useRef(false)
@@ -107,14 +127,32 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
     useEffect(() => {
         const channel = supabase
             .channel('public:chats')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, async (payload) => {
                 if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
                     const newChat = payload.new as any;
                     
                     if (newChat.id.includes("@g.us")) return;
 
+                    // Pega os IDs das etiquetas do array
+                    const etiquetaIds: string[] = newChat.etiqueta_ids || [];
+
+                    // Busca dados das etiquetas da tabela whatsapp_etiquetas
+                    let etiquetas: EtiquetaSimple[] = [];
+                    if (etiquetaIds.length > 0) {
+                      const { data: etiquetasData } = await supabase
+                        .from('whatsapp_etiquetas')
+                        .select('id, nome, cor')
+                        .in('id', etiquetaIds);
+                      
+                      if (etiquetasData) {
+                        // Mantém a ordem original das etiquetas
+                        etiquetas = etiquetaIds
+                          .map(id => etiquetasData.find(e => e.id === id))
+                          .filter(Boolean) as EtiquetaSimple[];
+                      }
+                    }
+
                     setChats((prevChats) => {
-                        // Remove a versão antiga se existir
                         const filtered = prevChats.filter(c => c.id !== newChat.id);
                         
                         const formattedChat: Chat = {
@@ -123,8 +161,9 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                             lastMessage: newChat.last_message,
                             lastMessageTime: newChat.last_message_time,
                             unreadCount: newChat.unread_count || 0,
-                            // Não usamos mais a URL do banco para exibição direta, mas mantemos no objeto
-                            pictureUrl: newChat.image_url, 
+                            pictureUrl: newChat.image_url,
+                            etiqueta_ids: etiquetaIds,
+                            etiquetas: etiquetas,
                         };
 
                         // Coloca no topo
@@ -139,6 +178,56 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
         };
     }, [supabase]);
 
+    // --- FUNÇÃO HELPER: Construir mapa de atribuições ---
+    const buildAssignmentsMap = async (assignments: any[]) => {
+      try {
+        if (!assignments || assignments.length === 0) {
+          console.log("[Atribuições] Sem atribuições, retornando mapa vazio")
+          return {}
+        }
+
+        console.log("[Atribuições] Construindo mapa para", assignments.length, "atribuições")
+
+        const userIds = Array.from(new Set(assignments.map((a) => a.assigned_to_id)))
+        
+        const { data: profiles } = await supabase
+          .from("perfis")
+          .select("id, nome, cargo")
+          .in("id", userIds)
+
+        const cargosUnicos = Array.from(new Set(profiles?.map((p) => p.cargo).filter(Boolean))) as string[]
+        const coresMap: Record<string, string> = {}
+
+        if (cargosUnicos.length > 0) {
+          const { data: cargosData } = await supabase
+            .from("cargos")
+            .select("nome, cor")
+            .in("nome", cargosUnicos)
+          cargosData?.forEach((c) => coresMap[c.nome] = c.cor)
+        }
+
+        const newAssignmentsMap: AtribuicoesMap = {}
+        assignments.forEach((assignment) => {
+          const profile = profiles?.find((p) => p.id === assignment.assigned_to_id)
+          if (profile) {
+            newAssignmentsMap[assignment.chat_id] = {
+              assigned_to_id: assignment.assigned_to_id,
+              assigned_to_name: profile.nome,
+              assigned_to_cargo: profile.cargo,
+              assigned_to_color: profile.cargo ? coresMap[profile.cargo] : undefined,
+            }
+            console.log(`[Atribuições] ${assignment.chat_id} => ${profile.nome}`)
+          }
+        })
+        
+        console.log("[Atribuições] Mapa construído com", Object.keys(newAssignmentsMap).length, "chats")
+        return { ...newAssignmentsMap } // Força um novo objeto
+      } catch (err) {
+        console.error("Erro ao construir mapa de atribuições:", err)
+        return {}
+      }
+    }
+
     // --- CARREGAMENTO DE ATRIBUIÇÕES (Mantido) ---
     useEffect(() => {
       const loadInitialAssignments = async () => {
@@ -148,44 +237,40 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
             .select("*")
             .eq("status", "active")
 
-          if (!activeAssignments || activeAssignments.length === 0) return
-
-          const userIds = Array.from(new Set(activeAssignments.map((a) => a.assigned_to_id)))
-          
-          const { data: profiles } = await supabase
-            .from("perfis")
-            .select("id, nome, cargo")
-            .in("id", userIds)
-
-          const cargosUnicos = Array.from(new Set(profiles?.map((p) => p.cargo).filter(Boolean))) as string[]
-          const coresMap: Record<string, string> = {}
-
-          if (cargosUnicos.length > 0) {
-            const { data: cargosData } = await supabase
-              .from("cargos")
-              .select("nome, cor")
-              .in("nome", cargosUnicos)
-            cargosData?.forEach((c) => coresMap[c.nome] = c.cor)
+          if (activeAssignments && activeAssignments.length > 0) {
+            const newAssignmentsMap = await buildAssignmentsMap(activeAssignments)
+            mutate(ATTR_CACHE_KEY, newAssignmentsMap, false)
           }
-
-          const newAssignmentsMap: AtribuicoesMap = {}
-          activeAssignments.forEach((assignment) => {
-            const profile = profiles?.find((p) => p.id === assignment.assigned_to_id)
-            if (profile) {
-              newAssignmentsMap[assignment.chat_id] = {
-                assigned_to_id: assignment.assigned_to_id,
-                assigned_to_name: profile.nome,
-                assigned_to_cargo: profile.cargo,
-                assigned_to_color: profile.cargo ? coresMap[profile.cargo] : undefined,
-              }
-            }
-          })
-          mutate(ATTR_CACHE_KEY, newAssignmentsMap, false)
         } catch (err) {
           console.error("Erro assignments:", err)
         }
       }
       loadInitialAssignments()
+    }, [supabase])
+
+    // --- REALTIME PARA ATRIBUIÇÕES ---
+    useEffect(() => {
+      const channel = supabase
+        .channel('public:chat_assignments')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_assignments' }, async (payload) => {
+          console.log("[Realtime] Mudança em chat_assignments:", payload.eventType, payload.new)
+          // Quando há mudança nas atribuições, recarrega o mapa inteiro
+          const { data: activeAssignments } = await supabase
+            .from("chat_assignments")
+            .select("*")
+            .eq("status", "active")
+
+          if (activeAssignments) {
+            const newAssignmentsMap = await buildAssignmentsMap(activeAssignments)
+            console.log("[Realtime] Atualizando atribuições map com:", Object.keys(newAssignmentsMap))
+            mutate(ATTR_CACHE_KEY, newAssignmentsMap, false)
+          }
+        })
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
     }, [supabase])
 
 
@@ -214,16 +299,56 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
 
         const { data, error, count } = await query
 
-        if (error) throw error
+        if (error) {
+          console.error("❌ ERRO Supabase:", error)
+          throw error
+        }
 
-        const newChats: Chat[] = (data || []).map(c => ({
-            id: c.id,
-            name: c.name,
-            lastMessage: c.last_message,
-            lastMessageTime: c.last_message_time,
-            unreadCount: c.unread_count,
-            pictureUrl: c.image_url,
-        }))
+        // Coleta todos os IDs de etiquetas de todos os chats (agora usa array etiqueta_ids)
+        const allEtiquetaIds: string[] = [];
+        const chatEtiquetaIdsMap: Record<string, string[]> = {};
+        
+        (data || []).forEach(c => {
+          const ids: string[] = c.etiqueta_ids || [];
+          chatEtiquetaIdsMap[c.id] = ids;
+          ids.forEach(id => {
+            if (!allEtiquetaIds.includes(id)) {
+              allEtiquetaIds.push(id);
+            }
+          });
+        });
+
+        // Busca dados de todas as etiquetas da tabela whatsapp_etiquetas
+        let etiquetasDataMap: Record<string, EtiquetaSimple> = {};
+        if (allEtiquetaIds.length > 0) {
+          const { data: etiquetasData } = await supabase
+            .from('whatsapp_etiquetas')
+            .select('id, nome, cor, descricao')
+            .in('id', allEtiquetaIds);
+          
+          if (etiquetasData) {
+            etiquetasData.forEach(e => {
+              etiquetasDataMap[e.id] = { id: e.id, nome: e.nome, cor: e.cor, descricao: e.descricao };
+            });
+          }
+        }
+
+        const newChats: Chat[] = (data || []).map(c => {
+            // Monta array de etiquetas na ordem correta
+            const etiquetas: EtiquetaSimple[] = (chatEtiquetaIdsMap[c.id] || [])
+              .map(id => etiquetasDataMap[id])
+              .filter(Boolean);
+            
+            return {
+              id: c.id,
+              name: c.name,
+              lastMessage: c.last_message,
+              lastMessageTime: c.last_message_time,
+              unreadCount: c.unread_count,
+              pictureUrl: c.image_url,
+              etiquetas: etiquetas,
+            };
+        });
 
         const hasMoreData = count ? (currentOffset + newChats.length) < count : false
 
@@ -244,7 +369,8 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
 
       } catch (err: any) {
         console.error("❌ ERRO chats:", err);
-        setError(`Erro ao carregar.`);
+        console.error("❌ ERRO details:", JSON.stringify(err, null, 2));
+        setError(`Erro ao carregar: ${err?.message || 'Desconhecido'}`);
       } finally {
         setLoading(false)
         setLoadingMore(false)
@@ -285,16 +411,46 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
     }
 
     const displayChats = useMemo(() => {
-        if (filterMode === 'all') return chats;
+        let filteredChats = chats;
 
+        // Filtro básico (Todas / Minhas)
         if (filterMode === 'mine' && currentUserId && assignmentsMap) {
-            return chats.filter(chat => {
+            filteredChats = filteredChats.filter(chat => {
                 const assignment = assignmentsMap[chat.id];
                 return assignment && assignment.assigned_to_id === currentUserId;
-            })
+            });
         }
-        return [];
-    }, [chats, filterMode, currentUserId, assignmentsMap]);
+
+        // Filtros avançados
+        if (advancedFilters.length > 0) {
+            filteredChats = filteredChats.filter(chat => {
+                return advancedFilters.every(filter => {
+                    if (!filter.value) return true; // Ignora filtros sem valor
+                    
+                    switch (filter.type) {
+                        case "etiqueta":
+                            // Verifica se o chat tem a etiqueta (em qualquer posição)
+                            return chat.etiquetas?.some(e => e.id === filter.value) || false;
+                        
+                        case "atribuicao":
+                            const assignment = assignmentsMap?.[chat.id];
+                            return assignment?.assigned_to_id === filter.value;
+                        
+                        case "sem_etiqueta":
+                            return !chat.etiquetas || chat.etiquetas.length === 0;
+                        
+                        case "sem_atribuicao":
+                            return !assignmentsMap?.[chat.id];
+                        
+                        default:
+                            return true;
+                    }
+                });
+            });
+        }
+
+        return filteredChats;
+    }, [chats, filterMode, currentUserId, assignmentsMap, advancedFilters]);
 
     if (loading && offset === 0) {
       return (
@@ -361,6 +517,10 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
             >
               Minhas
             </Button>
+            <ChatFilterPanel 
+              filters={advancedFilters} 
+              onFiltersChange={setAdvancedFilters} 
+            />
           </div>
         </div>
 
@@ -381,61 +541,344 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
               <div className="py-1">
                 {displayChats.map((chat) => {
                   const assignment = assignmentsMap?.[chat.id]
-                  
                   // 🔥 PROXY DE IMAGEM: Aponta para o seu backend no Render
                   // Isso garante que a imagem carregue mesmo se o link do WA expirar ou tiver CORS
                   const profilePicture = `${BACKEND_URL}/chats/avatar/${chat.id}`
 
+                  // Determina se tem etiquetas
+                  const hasEtiquetas = chat.etiquetas && chat.etiquetas.length > 0
+
                   return (
-                    <button
-                      key={chat.id}
-                      onClick={() => onSelectChat(chat)} 
-                      className={cn(
-                        "w-full flex items-center gap-2.5 px-3 py-2 transition-colors text-left hover:bg-accent/50",
-                        selectedChatId === chat.id && "bg-accent",
-                        chat.unreadCount > 0 && "border-l-2 border-primary bg-primary/5"
-                      )}
-                    >
-                      <Avatar className="w-10 h-10 flex-shrink-0">
-                        <AvatarImage 
-                            src={profilePicture} 
-                            alt={chat.name} 
-                            className="object-cover" 
-                        />
-                        {/* ✅ CORRIGIDO: Fallback com fundo cinza e ícone de User */}
-                        <AvatarFallback className="bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                          <User className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <p className="font-medium truncate text-sm">{chat.name}</p>
-                          <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                            {formatTime(chat.lastMessageTime)}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-1.5">
-                          {assignment ? (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 flex items-center gap-1 border" style={{ backgroundColor: assignment.assigned_to_color || "#6366f1", color: "#ffffff", borderColor: assignment.assigned_to_color || "#6366f1" }}>
-                              <User className="w-2.5 h-2.5" />
-                              <span className="max-w-[100px] truncate">{assignment.assigned_to_name}</span>
-                            </Badge>
-                          ) : (
-                            <p className="text-xs text-muted-foreground truncate flex-1 min-w-0">
-                              {chat.lastMessage || "Sem mensagens"}
-                            </p>
+                    <ContextMenu key={chat.id}>
+                      <ContextMenuTrigger asChild>
+                        <button
+                          onClick={() => onSelectChat(chat)} 
+                          className={cn(
+                            "w-full flex items-center gap-2.5 px-3 py-2 transition-colors text-left hover:bg-accent/50",
+                            selectedChatId === chat.id && "bg-accent",
+                            chat.unreadCount > 0 && "border-l-2 border-primary bg-primary/5"
                           )}
+                        >
+                          <Avatar className="w-10 h-10 flex-shrink-0">
+                            <AvatarImage 
+                                src={profilePicture} 
+                                alt={chat.name} 
+                                className="object-cover" 
+                            />
+                            {/* ✅ CORRIGIDO: Fallback com fundo cinza e ícone de User */}
+                            <AvatarFallback className="bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                              <User className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                            </AvatarFallback>
+                          </Avatar>
 
-                          {chat.unreadCount > 0 && (
-                            <span className="flex-shrink-0 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                              {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <p className="font-medium truncate text-sm">{chat.name}</p>
+                              <span className="text-[11px] text-muted-foreground flex-shrink-0">
+                                {formatTime(chat.lastMessageTime)}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                {/* Badge de atribuição com context menu */}
+                                {assignment && (
+                                  <ContextMenu>
+                                    <ContextMenuTrigger asChild>
+                                      <div onClick={(e) => e.stopPropagation()}>
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 flex items-center gap-1 border flex-shrink-0 cursor-context-menu" style={{ backgroundColor: assignment.assigned_to_color || "#6366f1", color: "#ffffff", borderColor: assignment.assigned_to_color || "#6366f1" }}>
+                                                <User className="w-2.5 h-2.5" />
+                                                <span className="max-w-[80px] truncate">{assignment.assigned_to_name}</span>
+                                              </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>Atribuição</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      </div>
+                                    </ContextMenuTrigger>
+                                    <ContextMenuContent className="w-48">
+                                      <ContextMenuItem
+                                        onClick={async (e) => {
+                                          e.stopPropagation()
+                                          try {
+                                            // Buscar a atribuição ativa para obter o ID
+                                            const res = await fetch(`/api/whatsapp/assignment?chatId=${chat.id}`)
+                                            const data = await res.json()
+                                            
+                                            if (data.assignment?.id) {
+                                              const deleteRes = await fetch("/api/whatsapp/assignment", {
+                                                method: "DELETE",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ assignmentId: data.assignment.id, chatId: chat.id })
+                                              })
+                                              
+                                              if (deleteRes.ok) {
+                                                toast.success("Atribuição removida")
+                                                onRefresh?.()
+                                              }
+                                            }
+                                          } catch {
+                                            toast.error("Erro ao remover atribuição")
+                                          }
+                                        }}
+                                        className="text-destructive focus:text-destructive"
+                                      >
+                                        <X className="w-4 h-4 mr-2" />
+                                        Remover atribuição
+                                      </ContextMenuItem>
+                                    </ContextMenuContent>
+                                  </ContextMenu>
+                                )}
+                                
+                                {/* Etiquetas com context menu individual */}
+                                {hasEtiquetas && assignment && (
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    {chat.etiquetas!.slice(0, 3).map((etiqueta) => (
+                                      <ContextMenu key={etiqueta.id}>
+                                        <ContextMenuTrigger asChild>
+                                          <div onClick={(e) => e.stopPropagation()}>
+                                            <TooltipProvider>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <Badge
+                                                    variant="secondary"
+                                                    className="text-[10px] px-1.5 py-0 h-5 flex items-center gap-1 border text-white cursor-context-menu"
+                                                    style={{ backgroundColor: etiqueta.cor, borderColor: etiqueta.cor }}
+                                                  >
+                                                    <Tag className="w-2.5 h-2.5" />
+                                                  </Badge>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                  <p>{etiqueta.nome}</p>
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            </TooltipProvider>
+                                          </div>
+                                        </ContextMenuTrigger>
+                                        <ContextMenuContent className="w-48">
+                                          <ContextMenuItem
+                                            onClick={async (e) => {
+                                              e.stopPropagation()
+                                              try {
+                                                const res = await fetch("/api/whatsapp/assign-tag", {
+                                                  method: "DELETE",
+                                                  headers: { "Content-Type": "application/json" },
+                                                  body: JSON.stringify({ chatId: chat.id, etiquetaId: etiqueta.id })
+                                                })
+                                                if (res.ok) {
+                                                  toast.success("Etiqueta removida")
+                                                  setChats(prev => prev.map(c => 
+                                                    c.id === chat.id 
+                                                      ? { ...c, etiquetas: c.etiquetas?.filter(e => e.id !== etiqueta.id) || [] }
+                                                      : c
+                                                  ))
+                                                  onRefresh?.()
+                                                }
+                                              } catch {
+                                                toast.error("Erro ao remover etiqueta")
+                                              }
+                                            }}
+                                            className="text-destructive focus:text-destructive"
+                                          >
+                                            <X className="w-4 h-4 mr-2" />
+                                            Remover essa etiqueta
+                                          </ContextMenuItem>
+                                          <ContextMenuSeparator />
+                                          <ContextMenuItem
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setContextMenuChat(chat)
+                                              setShowEtiquetasDialog(true)
+                                            }}
+                                          >
+                                            <Tags className="w-4 h-4 mr-2" />
+                                            Ver todas etiquetas
+                                          </ContextMenuItem>
+                                        </ContextMenuContent>
+                                      </ContextMenu>
+                                    ))}
+                                    {chat.etiquetas!.length > 3 && (
+                                      <Badge 
+                                        variant="secondary" 
+                                        className="text-[10px] px-1 py-0 h-5 cursor-pointer hover:bg-secondary/80"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setContextMenuChat(chat)
+                                          setShowEtiquetasDialog(true)
+                                        }}
+                                      >
+                                        +{chat.etiquetas!.length - 3}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {/* Mensagem quando não tem atribuição */}
+                                {!assignment && !hasEtiquetas && (
+                                  <p className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+                                    {chat.lastMessage || "Sem mensagens"}
+                                  </p>
+                                )}
+                              </div>
+
+                              {chat.unreadCount > 0 && (
+                                <span className="flex-shrink-0 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                                  {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Etiquetas abaixo do nome quando não tem atribuição */}
+                            {hasEtiquetas && !assignment && (
+                              <div className="flex items-center gap-1 mt-1">
+                                {chat.etiquetas!.slice(0, 4).map((etiqueta) => (
+                                  <ContextMenu key={etiqueta.id}>
+                                    <ContextMenuTrigger asChild>
+                                      <div onClick={(e) => e.stopPropagation()}>
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Badge
+                                                variant="secondary"
+                                                className="text-[10px] px-1.5 py-0 h-5 flex items-center gap-1 border text-white cursor-context-menu"
+                                                style={{ backgroundColor: etiqueta.cor, borderColor: etiqueta.cor }}
+                                              >
+                                                <Tag className="w-2.5 h-2.5" />
+                                                <span className="max-w-[60px] truncate">{etiqueta.nome}</span>
+                                              </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>{etiqueta.nome}</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      </div>
+                                    </ContextMenuTrigger>
+                                    <ContextMenuContent className="w-48">
+                                      <ContextMenuItem
+                                        onClick={async (e) => {
+                                          e.stopPropagation()
+                                          try {
+                                            const res = await fetch("/api/whatsapp/assign-tag", {
+                                              method: "DELETE",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ chatId: chat.id, etiquetaId: etiqueta.id })
+                                            })
+                                            if (res.ok) {
+                                              toast.success("Etiqueta removida")
+                                              setChats(prev => prev.map(c => 
+                                                c.id === chat.id 
+                                                  ? { ...c, etiquetas: c.etiquetas?.filter(e => e.id !== etiqueta.id) || [] }
+                                                  : c
+                                              ))
+                                              onRefresh?.()
+                                            }
+                                          } catch {
+                                            toast.error("Erro ao remover etiqueta")
+                                          }
+                                        }}
+                                        className="text-destructive focus:text-destructive"
+                                      >
+                                        <X className="w-4 h-4 mr-2" />
+                                        Remover essa etiqueta
+                                      </ContextMenuItem>
+                                      <ContextMenuSeparator />
+                                      <ContextMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setContextMenuChat(chat)
+                                          setShowEtiquetasDialog(true)
+                                        }}
+                                      >
+                                        <Tags className="w-4 h-4 mr-2" />
+                                        Ver todas etiquetas
+                                      </ContextMenuItem>
+                                    </ContextMenuContent>
+                                  </ContextMenu>
+                                ))}
+                                {chat.etiquetas!.length > 4 && (
+                                  <Badge 
+                                    variant="secondary" 
+                                    className="text-[10px] px-1 py-0 h-5 cursor-pointer hover:bg-secondary/80"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setContextMenuChat(chat)
+                                      setShowEtiquetasDialog(true)
+                                    }}
+                                  >
+                                    +{chat.etiquetas!.length - 4}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      </ContextMenuTrigger>
+                      <ContextMenuContent className="w-48">
+                        <ContextMenuItem 
+                          onClick={() => {
+                            setContextMenuChat(chat)
+                            setShowAssignDialog(true)
+                          }}
+                        >
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Atribuir
+                        </ContextMenuItem>
+                        <ContextMenuItem 
+                          onClick={() => {
+                            setContextMenuChat(chat)
+                            setShowTagSelector(true)
+                          }}
+                        >
+                          <Tag className="w-4 h-4 mr-2" />
+                          Adicionar etiqueta
+                        </ContextMenuItem>
+                        <ContextMenuItem 
+                          onClick={() => {
+                            setContextMenuChat(chat)
+                            setShowEditNameDialog(true)
+                          }}
+                        >
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Editar nome
+                        </ContextMenuItem>
+                        {hasEtiquetas && (
+                          <>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem 
+                              className="text-destructive focus:text-destructive"
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch("/api/whatsapp/assign-tag", {
+                                    method: "DELETE",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ chatId: chat.id })
+                                  })
+                                  if (res.ok) {
+                                    toast.success("Etiquetas removidas")
+                                    // Atualiza local
+                                    setChats(prev => prev.map(c => 
+                                      c.id === chat.id ? { ...c, etiquetas: [] } : c
+                                    ))
+                                    onRefresh?.()
+                                  }
+                                } catch {
+                                  toast.error("Erro ao remover etiquetas")
+                                }
+                              }}
+                            >
+                              <X className="w-4 h-4 mr-2" />
+                              Remover etiquetas
+                            </ContextMenuItem>
+                          </>
+                        )}
+                      </ContextMenuContent>
+                    </ContextMenu>
                   )
                 })}
               </div>
@@ -449,6 +892,99 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
             </>
           )}
         </div>
+
+        {/* DIALOGS do Context Menu */}
+        {contextMenuChat && (
+          <>
+            <EditChatNameDialog
+              open={showEditNameDialog}
+              onOpenChange={(open) => {
+                setShowEditNameDialog(open)
+                if (!open) setContextMenuChat(null)
+              }}
+              chatId={contextMenuChat.id}
+              currentName={contextMenuChat.name || contextMenuChat.id}
+              onSuccess={() => {
+                onRefresh?.()
+                setShowEditNameDialog(false)
+                setContextMenuChat(null)
+              }}
+            />
+
+            <AssignToUserDialog
+              open={showAssignDialog}
+              onOpenChange={(open) => {
+                setShowAssignDialog(open)
+                if (!open) setContextMenuChat(null)
+              }}
+              chatId={contextMenuChat.id}
+              chatName={contextMenuChat.name || contextMenuChat.id}
+              currentUserId={currentUserId}
+              currentAssignment={assignmentsMap?.[contextMenuChat.id] ? {
+                id: '',
+                chat_id: contextMenuChat.id,
+                chat_name: contextMenuChat.name || contextMenuChat.id,
+                assigned_to_id: assignmentsMap[contextMenuChat.id].assigned_to_id,
+                assigned_to_name: assignmentsMap[contextMenuChat.id].assigned_to_name,
+                assigned_by_id: '',
+                assigned_by_name: '',
+                assigned_at: '',
+                status: 'active',
+                notes: '',
+                created_at: '',
+                updated_at: ''
+              } : null}
+              chatAssignment={null}
+              onAssignSuccess={() => {
+                onRefresh?.()
+                setShowAssignDialog(false)
+                setContextMenuChat(null)
+              }}
+            />
+          </>
+        )}
+
+        {/* TagSelector como Dialog/Popover separado */}
+        {contextMenuChat && showTagSelector && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowTagSelector(false)}>
+            <div className="bg-background p-4 rounded-lg shadow-lg" onClick={(e) => e.stopPropagation()}>
+              <h3 className="font-medium mb-4">Adicionar etiqueta</h3>
+              <TagSelector
+                chatId={contextMenuChat.id}
+                currentEtiquetaId={contextMenuChat.etiqueta_ids?.[0] || null}
+                onTagAssigned={() => {
+                  onRefresh?.()
+                  setShowTagSelector(false)
+                  setContextMenuChat(null)
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Dialog de todas etiquetas do chat */}
+        {contextMenuChat && (
+          <ChatEtiquetasDialog
+            open={showEtiquetasDialog}
+            onOpenChange={(open) => {
+              setShowEtiquetasDialog(open)
+              if (!open) setContextMenuChat(null)
+            }}
+            chatId={contextMenuChat.id}
+            etiquetas={contextMenuChat.etiquetas || []}
+            onEtiquetaRemoved={() => {
+              onRefresh?.()
+              // Atualiza local
+              setChats(prev => prev.map(c => 
+                c.id === contextMenuChat.id 
+                  ? { ...c, etiquetas: c.etiquetas?.filter(e => 
+                      contextMenuChat.etiquetas?.some(ce => ce.id === e.id)
+                    ) || [] }
+                  : c
+              ))
+            }}
+          />
+        )}
       </div>
     )
   }

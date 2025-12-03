@@ -24,6 +24,16 @@ import {
   Edit,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
+  Tag,
+  ShoppingBag,
+  Copy,
+  ExternalLink,
+  Image as ImageIcon,
+  X,
+  Star,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useUser } from "@/contexts/user-context"
@@ -71,7 +81,57 @@ interface Category {
   created_by_name: string
 }
 
-type SettingsTab = "usuario" | "whatsapp" | "links" | "respostas-rapidas"
+interface Etiqueta {
+  id: string
+  nome: string
+  cor: string
+  descricao: string | null
+  created_by_name: string | null
+}
+
+interface Catalogo {
+  id: string
+  nome: string
+  slug: string
+  descricao: string | null
+  logo_url: string | null
+  cor_primaria: string
+  ativo: boolean
+  created_by_name: string | null
+  created_at: string
+}
+
+interface ProdutoTipo {
+  id: string
+  catalogo_id: string
+  nome: string
+  descricao: string | null
+  ordem: number
+}
+
+interface ProdutoImagem {
+  id: string
+  url: string
+  ordem: number
+  principal: boolean
+}
+
+interface Produto {
+  id: string
+  catalogo_id: string
+  tipo_id: string | null
+  nome: string
+  descricao: string | null
+  preco: number | null
+  preco_promocional: number | null
+  ativo: boolean
+  destaque: boolean
+  ordem: number
+  tipo: ProdutoTipo | null
+  imagens: ProdutoImagem[]
+}
+
+type SettingsTab = "usuario" | "whatsapp" | "links" | "respostas-rapidas" | "etiquetas" | "catalogo"
 
 // URL do Backend (para logout) - O ideal é buscar do banco, mas usaremos ENV/Hardcoded por consistência com ChatList
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "https://backend-sobt.onrender.com";
@@ -147,9 +207,52 @@ export default function AjustesPage() {
   const [newCategoryName, setNewCategoryName] = useState("")
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
 
+  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([])
+  const [loadingEtiquetas, setLoadingEtiquetas] = useState(false)
+  const [etiquetaDialogOpen, setEtiquetaDialogOpen] = useState(false)
+  const [editingEtiqueta, setEditingEtiqueta] = useState<Etiqueta | null>(null)
+  const [etiquetaForm, setEtiquetaForm] = useState({
+    nome: "",
+    cor: "#3B82F6",
+    descricao: "",
+  })
+
+  // Estados do Catálogo
+  const [catalogos, setCatalogos] = useState<Catalogo[]>([])
+  const [loadingCatalogos, setLoadingCatalogos] = useState(false)
+  const [catalogoDialogOpen, setCatalogoDialogOpen] = useState(false)
+  const [editingCatalogo, setEditingCatalogo] = useState<Catalogo | null>(null)
+  const [catalogoForm, setCatalogoForm] = useState({
+    nome: "",
+    descricao: "",
+    logo_url: "",
+    cor_primaria: "#000000",
+  })
+
+  // Estados de Produtos
+  const [selectedCatalogo, setSelectedCatalogo] = useState<Catalogo | null>(null)
+  const [produtos, setProdutos] = useState<Produto[]>([])
+  const [produtoTipos, setProdutoTipos] = useState<ProdutoTipo[]>([])
+  const [loadingProdutos, setLoadingProdutos] = useState(false)
+  const [produtoDialogOpen, setProdutoDialogOpen] = useState(false)
+  const [editingProduto, setEditingProduto] = useState<Produto | null>(null)
+  const [produtoForm, setProdutoForm] = useState({
+    nome: "",
+    descricao: "",
+    tipo_id: "",
+    preco: "",
+    preco_promocional: "",
+    destaque: false,
+    imagens: [] as string[],
+  })
+
+  // Estados de Tipos de Produto
+  const [tipoDialogOpen, setTipoDialogOpen] = useState(false)
+  const [newTipoNome, setNewTipoNome] = useState("")
+
   useEffect(() => {
     const tabParam = searchParams.get("tab")
-    if (tabParam && ["usuario", "whatsapp", "links", "respostas-rapidas"].includes(tabParam)) {
+    if (tabParam && ["usuario", "whatsapp", "links", "respostas-rapidas", "etiquetas", "catalogo"].includes(tabParam)) {
       setActiveTab(tabParam as SettingsTab)
     }
   }, [searchParams])
@@ -160,6 +263,12 @@ export default function AjustesPage() {
     if (activeTab === "respostas-rapidas") {
       loadQuickReplies()
       loadCategories()
+    }
+    if (activeTab === "etiquetas") {
+      loadEtiquetas()
+    }
+    if (activeTab === "catalogo") {
+      loadCatalogos()
     }
   }, [user, activeTab])
 
@@ -506,7 +615,447 @@ export default function AjustesPage() {
     }
   }
 
-  // O handleWhatsappSave já foi coberto pela função handleWhatsappUrlChange acima
+  async function loadEtiquetas() {
+    try {
+      setLoadingEtiquetas(true)
+      const response = await fetch("/api/whatsapp/etiquetas")
+      const data = await response.json()
+
+      if (data.success) {
+        setEtiquetas(data.etiquetas || [])
+      } else {
+        toast.error("Erro ao carregar etiquetas")
+      }
+    } catch (error) {
+      console.error("Erro ao carregar etiquetas:", error)
+      toast.error("Erro ao carregar etiquetas")
+    } finally {
+      setLoadingEtiquetas(false)
+    }
+  }
+
+  const openEtiquetaDialog = (etiqueta?: Etiqueta) => {
+    if (etiqueta) {
+      setEditingEtiqueta(etiqueta)
+      setEtiquetaForm({
+        nome: etiqueta.nome,
+        cor: etiqueta.cor,
+        descricao: etiqueta.descricao || "",
+      })
+    } else {
+      setEditingEtiqueta(null)
+      setEtiquetaForm({
+        nome: "",
+        cor: "#3B82F6",
+        descricao: "",
+      })
+    }
+    setEtiquetaDialogOpen(true)
+  }
+
+  async function handleSaveEtiqueta() {
+    if (!etiquetaForm.nome.trim() || !etiquetaForm.cor.trim()) {
+      toast.error("Nome e cor são obrigatórios")
+      return
+    }
+
+    try {
+      const method = editingEtiqueta ? "PUT" : "POST"
+      const body = editingEtiqueta ? { id: editingEtiqueta.id, ...etiquetaForm } : etiquetaForm
+
+      const response = await fetch("/api/whatsapp/etiquetas", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success(editingEtiqueta ? "Etiqueta atualizada" : "Etiqueta criada")
+        setEtiquetaDialogOpen(false)
+        loadEtiquetas()
+      } else {
+        toast.error(data.message || "Erro ao salvar etiqueta")
+      }
+    } catch (error) {
+      console.error("Erro ao salvar etiqueta:", error)
+      toast.error("Erro ao salvar etiqueta")
+    }
+  }
+
+  async function handleDeleteEtiqueta(id: string) {
+    if (!confirm("Tem certeza que deseja deletar esta etiqueta?")) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/whatsapp/etiquetas?id=${id}`, { method: "DELETE" })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success("Etiqueta deletada")
+        loadEtiquetas()
+      } else {
+        toast.error(data.message || "Erro ao deletar etiqueta")
+      }
+    } catch (error) {
+      console.error("Erro ao deletar etiqueta:", error)
+      toast.error("Erro ao deletar etiqueta")
+    }
+  }
+
+  // ========== FUNÇÕES DO CATÁLOGO ==========
+
+  async function loadCatalogos() {
+    try {
+      setLoadingCatalogos(true)
+      const response = await fetch("/api/catalogo")
+      const data = await response.json()
+      setCatalogos(data || [])
+    } catch (error) {
+      console.error("Erro ao carregar catálogos:", error)
+      toast.error("Erro ao carregar catálogos")
+    } finally {
+      setLoadingCatalogos(false)
+    }
+  }
+
+  const openCatalogoDialog = (catalogo?: Catalogo) => {
+    if (catalogo) {
+      setEditingCatalogo(catalogo)
+      setCatalogoForm({
+        nome: catalogo.nome,
+        descricao: catalogo.descricao || "",
+        logo_url: catalogo.logo_url || "",
+        cor_primaria: catalogo.cor_primaria || "#000000",
+      })
+    } else {
+      setEditingCatalogo(null)
+      setCatalogoForm({
+        nome: "",
+        descricao: "",
+        logo_url: "",
+        cor_primaria: "#000000",
+      })
+    }
+    setCatalogoDialogOpen(true)
+  }
+
+  async function handleSaveCatalogo() {
+    if (!catalogoForm.nome.trim()) {
+      toast.error("Nome é obrigatório")
+      return
+    }
+
+    try {
+      const method = editingCatalogo ? "PATCH" : "POST"
+      const body = editingCatalogo 
+        ? { id: editingCatalogo.id, ...catalogoForm }
+        : { ...catalogoForm, created_by_id: user?.id, created_by_name: user?.nome }
+
+      const response = await fetch("/api/catalogo", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+
+      if (response.ok) {
+        toast.success(editingCatalogo ? "Catálogo atualizado" : "Catálogo criado")
+        setCatalogoDialogOpen(false)
+        loadCatalogos()
+      } else {
+        const data = await response.json()
+        toast.error(data.error || "Erro ao salvar catálogo")
+      }
+    } catch (error) {
+      console.error("Erro ao salvar catálogo:", error)
+      toast.error("Erro ao salvar catálogo")
+    }
+  }
+
+  async function handleDeleteCatalogo(id: string) {
+    if (!confirm("Tem certeza que deseja deletar este catálogo? Todos os produtos serão excluídos.")) {
+      return
+    }
+
+    try {
+      const response = await fetch("/api/catalogo", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+
+      if (response.ok) {
+        toast.success("Catálogo deletado")
+        if (selectedCatalogo?.id === id) {
+          setSelectedCatalogo(null)
+          setProdutos([])
+          setProdutoTipos([])
+        }
+        loadCatalogos()
+      } else {
+        const data = await response.json()
+        toast.error(data.error || "Erro ao deletar catálogo")
+      }
+    } catch (error) {
+      console.error("Erro ao deletar catálogo:", error)
+      toast.error("Erro ao deletar catálogo")
+    }
+  }
+
+  async function handleToggleCatalogoAtivo(catalogo: Catalogo) {
+    try {
+      const response = await fetch("/api/catalogo", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: catalogo.id, ativo: !catalogo.ativo }),
+      })
+
+      if (response.ok) {
+        toast.success(catalogo.ativo ? "Catálogo desativado" : "Catálogo ativado")
+        loadCatalogos()
+      }
+    } catch (error) {
+      console.error("Erro ao alterar status:", error)
+      toast.error("Erro ao alterar status")
+    }
+  }
+
+  function copyCatalogoLink(slug: string) {
+    const baseUrl = window.location.origin
+    const link = `${baseUrl}/catalogo/${slug}`
+    navigator.clipboard.writeText(link)
+    toast.success("Link copiado!")
+  }
+
+  async function selectCatalogo(catalogo: Catalogo) {
+    setSelectedCatalogo(catalogo)
+    setLoadingProdutos(true)
+
+    try {
+      // Carregar tipos e produtos em paralelo
+      const [tiposRes, produtosRes] = await Promise.all([
+        fetch(`/api/catalogo/tipos?catalogo_id=${catalogo.id}`),
+        fetch(`/api/catalogo/produtos?catalogo_id=${catalogo.id}`),
+      ])
+
+      const tiposData = await tiposRes.json()
+      const produtosData = await produtosRes.json()
+
+      setProdutoTipos(tiposData || [])
+      setProdutos(produtosData || [])
+    } catch (error) {
+      console.error("Erro ao carregar dados do catálogo:", error)
+      toast.error("Erro ao carregar dados")
+    } finally {
+      setLoadingProdutos(false)
+    }
+  }
+
+  // ========== FUNÇÕES DE TIPOS DE PRODUTO ==========
+
+  async function handleSaveTipo() {
+    if (!newTipoNome.trim() || !selectedCatalogo) {
+      toast.error("Nome é obrigatório")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/catalogo/tipos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          catalogo_id: selectedCatalogo.id,
+          nome: newTipoNome,
+        }),
+      })
+
+      if (response.ok) {
+        toast.success("Tipo criado")
+        setTipoDialogOpen(false)
+        setNewTipoNome("")
+        // Recarregar tipos
+        const tiposRes = await fetch(`/api/catalogo/tipos?catalogo_id=${selectedCatalogo.id}`)
+        const tiposData = await tiposRes.json()
+        setProdutoTipos(tiposData || [])
+      } else {
+        const data = await response.json()
+        toast.error(data.error || "Erro ao criar tipo")
+      }
+    } catch (error) {
+      console.error("Erro ao criar tipo:", error)
+      toast.error("Erro ao criar tipo")
+    }
+  }
+
+  async function handleDeleteTipo(id: string) {
+    if (!confirm("Tem certeza que deseja deletar este tipo?")) return
+
+    try {
+      const response = await fetch("/api/catalogo/tipos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+
+      if (response.ok) {
+        toast.success("Tipo deletado")
+        setProdutoTipos(prev => prev.filter(t => t.id !== id))
+      }
+    } catch (error) {
+      console.error("Erro ao deletar tipo:", error)
+      toast.error("Erro ao deletar tipo")
+    }
+  }
+
+  // ========== FUNÇÕES DE PRODUTOS ==========
+
+  const openProdutoDialog = (produto?: Produto) => {
+    if (produto) {
+      setEditingProduto(produto)
+      setProdutoForm({
+        nome: produto.nome,
+        descricao: produto.descricao || "",
+        tipo_id: produto.tipo_id || "",
+        preco: produto.preco?.toString() || "",
+        preco_promocional: produto.preco_promocional?.toString() || "",
+        destaque: produto.destaque,
+        imagens: produto.imagens?.map(img => img.url) || [],
+      })
+    } else {
+      setEditingProduto(null)
+      setProdutoForm({
+        nome: "",
+        descricao: "",
+        tipo_id: "",
+        preco: "",
+        preco_promocional: "",
+        destaque: false,
+        imagens: [],
+      })
+    }
+    setProdutoDialogOpen(true)
+  }
+
+  async function handleSaveProduto() {
+    if (!produtoForm.nome.trim() || !selectedCatalogo) {
+      toast.error("Nome é obrigatório")
+      return
+    }
+
+    try {
+      const method = editingProduto ? "PATCH" : "POST"
+      const body = {
+        ...(editingProduto ? { id: editingProduto.id } : { catalogo_id: selectedCatalogo.id }),
+        nome: produtoForm.nome,
+        descricao: produtoForm.descricao || null,
+        tipo_id: produtoForm.tipo_id || null,
+        preco: produtoForm.preco ? parseFloat(produtoForm.preco) : null,
+        preco_promocional: produtoForm.preco_promocional ? parseFloat(produtoForm.preco_promocional) : null,
+        destaque: produtoForm.destaque,
+        imagens: produtoForm.imagens,
+        created_by_id: user?.id,
+        created_by_name: user?.nome,
+      }
+
+      const response = await fetch("/api/catalogo/produtos", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+
+      if (response.ok) {
+        toast.success(editingProduto ? "Produto atualizado" : "Produto criado")
+        setProdutoDialogOpen(false)
+        // Recarregar produtos
+        const produtosRes = await fetch(`/api/catalogo/produtos?catalogo_id=${selectedCatalogo.id}`)
+        const produtosData = await produtosRes.json()
+        setProdutos(produtosData || [])
+      } else {
+        const data = await response.json()
+        toast.error(data.error || "Erro ao salvar produto")
+      }
+    } catch (error) {
+      console.error("Erro ao salvar produto:", error)
+      toast.error("Erro ao salvar produto")
+    }
+  }
+
+  async function handleDeleteProduto(id: string) {
+    if (!confirm("Tem certeza que deseja deletar este produto?")) return
+
+    try {
+      const response = await fetch("/api/catalogo/produtos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+
+      if (response.ok) {
+        toast.success("Produto deletado")
+        setProdutos(prev => prev.filter(p => p.id !== id))
+      }
+    } catch (error) {
+      console.error("Erro ao deletar produto:", error)
+      toast.error("Erro ao deletar produto")
+    }
+  }
+
+  async function handleToggleProdutoAtivo(produto: Produto) {
+    try {
+      const response = await fetch("/api/catalogo/produtos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: produto.id, ativo: !produto.ativo }),
+      })
+
+      if (response.ok) {
+        toast.success(produto.ativo ? "Produto desativado" : "Produto ativado")
+        setProdutos(prev => prev.map(p => 
+          p.id === produto.id ? { ...p, ativo: !p.ativo } : p
+        ))
+      }
+    } catch (error) {
+      console.error("Erro ao alterar status:", error)
+      toast.error("Erro ao alterar status")
+    }
+  }
+
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files) return
+
+    Array.from(files).forEach(file => {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string
+        setProdutoForm(prev => ({
+          ...prev,
+          imagens: [...prev.imagens, base64],
+        }))
+      }
+      reader.readAsDataURL(file)
+    })
+
+    // Limpar input para permitir selecionar a mesma imagem novamente
+    e.target.value = ""
+  }
+
+  function removeImage(index: number) {
+    setProdutoForm(prev => ({
+      ...prev,
+      imagens: prev.imagens.filter((_, i) => i !== index),
+    }))
+  }
+
+  function formatPreco(valor: string) {
+    return valor ? new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(parseFloat(valor)) : '-'
+  }
 
   return (
     <div className="flex h-screen bg-neutral-100">
@@ -570,6 +1119,30 @@ export default function AjustesPage() {
           >
             <Zap className="w-5 h-5 flex-shrink-0" />
             <span>Respostas Rápidas</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("etiquetas")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeTab === "etiquetas"
+                ? "bg-neutral-900 text-white font-medium"
+                : "text-neutral-700 hover:bg-neutral-100"
+            }`}
+          >
+            <Tag className="w-5 h-5 flex-shrink-0" />
+            <span>Etiquetas</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("catalogo")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeTab === "catalogo"
+                ? "bg-neutral-900 text-white font-medium"
+                : "text-neutral-700 hover:bg-neutral-100"
+            }`}
+          >
+            <ShoppingBag className="w-5 h-5 flex-shrink-0" />
+            <span>Catálogo</span>
           </button>
 
           <button
@@ -857,6 +1430,436 @@ export default function AjustesPage() {
             </div>
           )}
 
+          {activeTab === "etiquetas" && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-neutral-900">Etiquetas</h2>
+                  <p className="text-sm text-neutral-600 mt-1">
+                    Configure etiquetas para categorizar seus chats do WhatsApp
+                  </p>
+                </div>
+                <Button onClick={() => openEtiquetaDialog()} className="bg-neutral-900 hover:bg-neutral-800">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nova Etiqueta
+                </Button>
+              </div>
+
+              {loadingEtiquetas ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-neutral-600" />
+                </div>
+              ) : etiquetas.length === 0 ? (
+                <Card className="p-12 text-center border-2 border-dashed border-neutral-300">
+                  <Tag className="w-12 h-12 mx-auto text-neutral-400 mb-4" />
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-2">Nenhuma etiqueta cadastrada</h3>
+                  <p className="text-sm text-neutral-600 mb-4">
+                    Crie etiquetas para organizar e categorizar seus chats
+                  </p>
+                  <Button onClick={() => openEtiquetaDialog()} className="bg-neutral-900 hover:bg-neutral-800">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Criar Primeira Etiqueta
+                  </Button>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {etiquetas.map((etiqueta) => (
+                    <Card key={etiqueta.id} className="p-4 border-2 border-neutral-300 bg-white">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2 flex-1">
+                          <div
+                            className="w-8 h-8 rounded-lg flex items-center justify-center"
+                            style={{ backgroundColor: etiqueta.cor }}
+                          >
+                            <Tag className="w-4 h-4 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-neutral-900 truncate">{etiqueta.nome}</h3>
+                            <p className="text-xs text-neutral-500">
+                              {etiqueta.created_by_name || "Sistema"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openEtiquetaDialog(etiqueta)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDeleteEtiqueta(etiqueta.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      {etiqueta.descricao && (
+                        <p className="text-sm text-neutral-600 line-clamp-2">{etiqueta.descricao}</p>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "catalogo" && (
+            <div>
+              {!selectedCatalogo ? (
+                <>
+                  {/* Lista de Catálogos */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-xl font-bold text-neutral-900">Catálogos</h2>
+                      <p className="text-sm text-neutral-600 mt-1">
+                        Gerencie seus catálogos de produtos com links públicos para compartilhar
+                      </p>
+                    </div>
+                    <Button onClick={() => openCatalogoDialog()} className="bg-neutral-900 hover:bg-neutral-800">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Novo Catálogo
+                    </Button>
+                  </div>
+
+                  {loadingCatalogos ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-6 h-6 animate-spin text-neutral-600" />
+                    </div>
+                  ) : catalogos.length === 0 ? (
+                    <Card className="p-12 text-center border-2 border-dashed border-neutral-300">
+                      <ShoppingBag className="w-12 h-12 mx-auto text-neutral-400 mb-4" />
+                      <h3 className="text-lg font-semibold text-neutral-900 mb-2">Nenhum catálogo cadastrado</h3>
+                      <p className="text-sm text-neutral-600 mb-4">
+                        Crie catálogos para exibir seus produtos em páginas públicas
+                      </p>
+                      <Button onClick={() => openCatalogoDialog()} className="bg-neutral-900 hover:bg-neutral-800">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Criar Primeiro Catálogo
+                      </Button>
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {catalogos.map((catalogo) => (
+                        <Card 
+                          key={catalogo.id} 
+                          className={`p-4 border-2 bg-white cursor-pointer transition-all hover:shadow-lg ${
+                            catalogo.ativo ? 'border-neutral-300 hover:border-neutral-900' : 'border-neutral-200 opacity-60'
+                          }`}
+                          onClick={() => selectCatalogo(catalogo)}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3 flex-1">
+                              {catalogo.logo_url ? (
+                                <img 
+                                  src={catalogo.logo_url} 
+                                  alt={catalogo.nome}
+                                  className="w-12 h-12 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <div 
+                                  className="w-12 h-12 rounded-lg flex items-center justify-center"
+                                  style={{ backgroundColor: catalogo.cor_primaria }}
+                                >
+                                  <ShoppingBag className="w-6 h-6 text-white" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-neutral-900 truncate">{catalogo.nome}</h3>
+                                <p className="text-xs text-neutral-500">/{catalogo.slug}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => copyCatalogoLink(catalogo.slug)}
+                                title="Copiar link"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => window.open(`/catalogo/${catalogo.slug}`, '_blank')}
+                                title="Abrir catálogo"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          {catalogo.descricao && (
+                            <p className="text-sm text-neutral-600 line-clamp-2 mb-3">{catalogo.descricao}</p>
+                          )}
+                          <div className="flex items-center justify-between pt-2 border-t border-neutral-200" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => handleToggleCatalogoAtivo(catalogo)}
+                              className={`flex items-center gap-1 text-xs ${
+                                catalogo.ativo ? 'text-green-600' : 'text-neutral-500'
+                              }`}
+                            >
+                              {catalogo.ativo ? (
+                                <ToggleRight className="w-5 h-5" />
+                              ) : (
+                                <ToggleLeft className="w-5 h-5" />
+                              )}
+                              {catalogo.ativo ? 'Ativo' : 'Inativo'}
+                            </button>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => openCatalogoDialog(catalogo)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => handleDeleteCatalogo(catalogo.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Detalhes do Catálogo Selecionado */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCatalogo(null)
+                          setProdutos([])
+                          setProdutoTipos([])
+                        }}
+                      >
+                        <ChevronLeft className="w-4 h-4 mr-1" />
+                        Voltar
+                      </Button>
+                      <div className="flex items-center gap-3">
+                        {selectedCatalogo.logo_url ? (
+                          <img 
+                            src={selectedCatalogo.logo_url} 
+                            alt={selectedCatalogo.nome}
+                            className="w-10 h-10 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div 
+                            className="w-10 h-10 rounded-lg flex items-center justify-center"
+                            style={{ backgroundColor: selectedCatalogo.cor_primaria }}
+                          >
+                            <ShoppingBag className="w-5 h-5 text-white" />
+                          </div>
+                        )}
+                        <div>
+                          <h2 className="text-xl font-bold text-neutral-900">{selectedCatalogo.nome}</h2>
+                          <p className="text-xs text-neutral-500">/{selectedCatalogo.slug}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyCatalogoLink(selectedCatalogo.slug)}
+                      >
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copiar Link
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`/catalogo/${selectedCatalogo.slug}`, '_blank')}
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Ver Catálogo
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Tipos de Produto */}
+                  <Card className="p-4 border-2 border-neutral-300 bg-white mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-neutral-900">Tipos de Produto</h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setTipoDialogOpen(true)}
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Novo Tipo
+                      </Button>
+                    </div>
+                    {produtoTipos.length === 0 ? (
+                      <p className="text-sm text-neutral-500">Nenhum tipo cadastrado</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {produtoTipos.map((tipo) => (
+                          <div
+                            key={tipo.id}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-neutral-100 rounded-lg text-sm"
+                          >
+                            <span>{tipo.nome}</span>
+                            <button
+                              onClick={() => handleDeleteTipo(tipo.id)}
+                              className="ml-1 text-neutral-400 hover:text-red-500"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </Card>
+
+                  {/* Produtos */}
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-neutral-900">
+                      Produtos ({produtos.length})
+                    </h3>
+                    <Button onClick={() => openProdutoDialog()} className="bg-neutral-900 hover:bg-neutral-800">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Novo Produto
+                    </Button>
+                  </div>
+
+                  {loadingProdutos ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-6 h-6 animate-spin text-neutral-600" />
+                    </div>
+                  ) : produtos.length === 0 ? (
+                    <Card className="p-12 text-center border-2 border-dashed border-neutral-300">
+                      <ShoppingBag className="w-12 h-12 mx-auto text-neutral-400 mb-4" />
+                      <h3 className="text-lg font-semibold text-neutral-900 mb-2">Nenhum produto cadastrado</h3>
+                      <p className="text-sm text-neutral-600 mb-4">
+                        Adicione produtos ao seu catálogo
+                      </p>
+                      <Button onClick={() => openProdutoDialog()} className="bg-neutral-900 hover:bg-neutral-800">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar Produto
+                      </Button>
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {produtos.map((produto) => {
+                        const imagemPrincipal = produto.imagens?.find(img => img.principal) || produto.imagens?.[0]
+                        return (
+                          <Card 
+                            key={produto.id} 
+                            className={`overflow-hidden border-2 bg-white ${
+                              produto.ativo ? 'border-neutral-300' : 'border-neutral-200 opacity-60'
+                            }`}
+                          >
+                            {/* Imagem */}
+                            <div className="relative aspect-square bg-neutral-100">
+                              {imagemPrincipal ? (
+                                <img
+                                  src={imagemPrincipal.url}
+                                  alt={produto.nome}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <ImageIcon className="w-12 h-12 text-neutral-300" />
+                                </div>
+                              )}
+                              {produto.destaque && (
+                                <div className="absolute top-2 left-2 px-2 py-1 bg-yellow-500 text-white text-xs font-medium rounded flex items-center gap-1">
+                                  <Star className="w-3 h-3" />
+                                  Destaque
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Info */}
+                            <div className="p-4">
+                              {produto.tipo && (
+                                <span className="text-xs font-medium text-neutral-500 uppercase">
+                                  {produto.tipo.nome}
+                                </span>
+                              )}
+                              <h4 className="font-semibold text-neutral-900 line-clamp-1">{produto.nome}</h4>
+                              {produto.preco !== null && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  {produto.preco_promocional !== null ? (
+                                    <>
+                                      <span className="font-bold text-green-600">
+                                        {formatPreco(produto.preco_promocional.toString())}
+                                      </span>
+                                      <span className="text-sm text-neutral-400 line-through">
+                                        {formatPreco(produto.preco.toString())}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="font-bold text-neutral-900">
+                                      {formatPreco(produto.preco.toString())}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Ações */}
+                              <div className="flex items-center justify-between pt-3 mt-3 border-t border-neutral-200">
+                                <button
+                                  onClick={() => handleToggleProdutoAtivo(produto)}
+                                  className={`flex items-center gap-1 text-xs ${
+                                    produto.ativo ? 'text-green-600' : 'text-neutral-500'
+                                  }`}
+                                >
+                                  {produto.ativo ? (
+                                    <ToggleRight className="w-5 h-5" />
+                                  ) : (
+                                    <ToggleLeft className="w-5 h-5" />
+                                  )}
+                                  {produto.ativo ? 'Ativo' : 'Inativo'}
+                                </button>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => openProdutoDialog(produto)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    onClick={() => handleDeleteProduto(produto.id)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           {activeTab === "links" && (
             <div>
               <h2 className="text-xl font-bold text-neutral-900 mb-4">Links Úteis</h2>
@@ -988,6 +1991,352 @@ export default function AjustesPage() {
             </Button>
             <Button onClick={handleSaveReply} className="bg-neutral-900 hover:bg-neutral-800">
               {editingReply ? "Salvar Alterações" : "Criar Resposta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={etiquetaDialogOpen} onOpenChange={setEtiquetaDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingEtiqueta ? "Editar Etiqueta" : "Nova Etiqueta"}</DialogTitle>
+            <DialogDescription>Configure uma etiqueta para categorizar seus chats</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="etiqueta-nome">Nome da Etiqueta</Label>
+              <Input
+                id="etiqueta-nome"
+                placeholder="Ex: Urgente, Vendas, Suporte..."
+                value={etiquetaForm.nome}
+                onChange={(e) => setEtiquetaForm({ ...etiquetaForm, nome: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="etiqueta-cor">Cor</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="etiqueta-cor"
+                  type="color"
+                  value={etiquetaForm.cor}
+                  onChange={(e) => setEtiquetaForm({ ...etiquetaForm, cor: e.target.value })}
+                  className="w-20 h-10 cursor-pointer"
+                />
+                <Input
+                  value={etiquetaForm.cor}
+                  onChange={(e) => setEtiquetaForm({ ...etiquetaForm, cor: e.target.value })}
+                  placeholder="#3B82F6"
+                  className="flex-1"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="etiqueta-descricao">Descrição (Opcional)</Label>
+              <Textarea
+                id="etiqueta-descricao"
+                placeholder="Descreva o propósito desta etiqueta..."
+                value={etiquetaForm.descricao}
+                onChange={(e) => setEtiquetaForm({ ...etiquetaForm, descricao: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="flex items-center gap-2 p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: etiquetaForm.cor }}
+              >
+                <Tag className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-sm">Preview</p>
+                <p className="text-xs text-neutral-600">{etiquetaForm.nome || "Nome da etiqueta"}</p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEtiquetaDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEtiqueta} className="bg-neutral-900 hover:bg-neutral-800">
+              {editingEtiqueta ? "Salvar Alterações" : "Criar Etiqueta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Catálogo */}
+      <Dialog open={catalogoDialogOpen} onOpenChange={setCatalogoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingCatalogo ? "Editar Catálogo" : "Novo Catálogo"}</DialogTitle>
+            <DialogDescription>Configure seu catálogo de produtos</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="catalogo-nome">Nome do Catálogo</Label>
+              <Input
+                id="catalogo-nome"
+                placeholder="Ex: Produtos 2024, Coleção Verão..."
+                value={catalogoForm.nome}
+                onChange={(e) => setCatalogoForm({ ...catalogoForm, nome: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="catalogo-descricao">Descrição (Opcional)</Label>
+              <Textarea
+                id="catalogo-descricao"
+                placeholder="Descreva seu catálogo..."
+                value={catalogoForm.descricao}
+                onChange={(e) => setCatalogoForm({ ...catalogoForm, descricao: e.target.value })}
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="catalogo-cor">Cor Primária</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="catalogo-cor"
+                  type="color"
+                  value={catalogoForm.cor_primaria}
+                  onChange={(e) => setCatalogoForm({ ...catalogoForm, cor_primaria: e.target.value })}
+                  className="w-20 h-10 cursor-pointer"
+                />
+                <Input
+                  value={catalogoForm.cor_primaria}
+                  onChange={(e) => setCatalogoForm({ ...catalogoForm, cor_primaria: e.target.value })}
+                  placeholder="#000000"
+                  className="flex-1"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="catalogo-logo">Logo (URL ou Base64)</Label>
+              <Input
+                id="catalogo-logo"
+                placeholder="https://... ou deixe vazio"
+                value={catalogoForm.logo_url}
+                onChange={(e) => setCatalogoForm({ ...catalogoForm, logo_url: e.target.value })}
+              />
+            </div>
+
+            {/* Preview */}
+            <div className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+              {catalogoForm.logo_url ? (
+                <img 
+                  src={catalogoForm.logo_url} 
+                  alt="Preview"
+                  className="w-12 h-12 rounded-lg object-cover"
+                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                />
+              ) : (
+                <div 
+                  className="w-12 h-12 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: catalogoForm.cor_primaria }}
+                >
+                  <ShoppingBag className="w-6 h-6 text-white" />
+                </div>
+              )}
+              <div className="flex-1">
+                <p className="font-medium text-sm">{catalogoForm.nome || "Nome do catálogo"}</p>
+                <p className="text-xs text-neutral-500">Preview do cabeçalho</p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCatalogoDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveCatalogo} className="bg-neutral-900 hover:bg-neutral-800">
+              {editingCatalogo ? "Salvar Alterações" : "Criar Catálogo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Tipo de Produto */}
+      <Dialog open={tipoDialogOpen} onOpenChange={setTipoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo Tipo de Produto</DialogTitle>
+            <DialogDescription>Crie uma categoria para organizar seus produtos</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="tipo-nome">Nome do Tipo</Label>
+              <Input
+                id="tipo-nome"
+                placeholder="Ex: Eletrônicos, Roupas, Acessórios..."
+                value={newTipoNome}
+                onChange={(e) => setNewTipoNome(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTipoDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveTipo} className="bg-neutral-900 hover:bg-neutral-800">
+              Criar Tipo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Produto */}
+      <Dialog open={produtoDialogOpen} onOpenChange={setProdutoDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingProduto ? "Editar Produto" : "Novo Produto"}</DialogTitle>
+            <DialogDescription>Adicione ou edite um produto do catálogo</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="produto-nome">Nome do Produto *</Label>
+                <Input
+                  id="produto-nome"
+                  placeholder="Ex: Camiseta Básica"
+                  value={produtoForm.nome}
+                  onChange={(e) => setProdutoForm({ ...produtoForm, nome: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="produto-tipo">Tipo</Label>
+                <Select
+                  value={produtoForm.tipo_id}
+                  onValueChange={(value) => {
+                    if (value === "new") {
+                      setTipoDialogOpen(true)
+                    } else {
+                      setProdutoForm({ ...produtoForm, tipo_id: value })
+                    }
+                  }}
+                >
+                  <SelectTrigger id="produto-tipo">
+                    <SelectValue placeholder="Selecione um tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {produtoTipos.map((tipo) => (
+                      <SelectItem key={tipo.id} value={tipo.id}>
+                        {tipo.nome}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="new" className="text-primary font-medium">
+                      + Criar novo tipo
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="produto-descricao">Descrição</Label>
+              <Textarea
+                id="produto-descricao"
+                placeholder="Descreva o produto..."
+                value={produtoForm.descricao}
+                onChange={(e) => setProdutoForm({ ...produtoForm, descricao: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="produto-preco">Preço (R$)</Label>
+                <Input
+                  id="produto-preco"
+                  type="number"
+                  step="0.01"
+                  placeholder="0,00"
+                  value={produtoForm.preco}
+                  onChange={(e) => setProdutoForm({ ...produtoForm, preco: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="produto-preco-promocional">Preço Promocional (R$)</Label>
+                <Input
+                  id="produto-preco-promocional"
+                  type="number"
+                  step="0.01"
+                  placeholder="0,00"
+                  value={produtoForm.preco_promocional}
+                  onChange={(e) => setProdutoForm({ ...produtoForm, preco_promocional: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="produto-destaque"
+                checked={produtoForm.destaque}
+                onChange={(e) => setProdutoForm({ ...produtoForm, destaque: e.target.checked })}
+                className="w-4 h-4 rounded border-neutral-300"
+              />
+              <Label htmlFor="produto-destaque" className="text-sm cursor-pointer">
+                Marcar como produto em destaque
+              </Label>
+            </div>
+
+            {/* Upload de Imagens */}
+            <div className="space-y-2">
+              <Label>Imagens do Produto</Label>
+              <div className="grid grid-cols-4 gap-2">
+                {produtoForm.imagens.map((img, index) => (
+                  <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-neutral-100">
+                    <img src={img} alt={`Imagem ${index + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    {index === 0 && (
+                      <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/70 text-white text-xs rounded">
+                        Principal
+                      </span>
+                    )}
+                  </div>
+                ))}
+                <label className="aspect-square rounded-lg border-2 border-dashed border-neutral-300 flex flex-col items-center justify-center cursor-pointer hover:bg-neutral-50 transition-colors">
+                  <ImageIcon className="w-6 h-6 text-neutral-400" />
+                  <span className="text-xs text-neutral-500 mt-1">Adicionar</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+              <p className="text-xs text-neutral-500">
+                A primeira imagem será a principal. Arraste para reordenar.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProdutoDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveProduto} className="bg-neutral-900 hover:bg-neutral-800">
+              {editingProduto ? "Salvar Alterações" : "Criar Produto"}
             </Button>
           </DialogFooter>
         </DialogContent>

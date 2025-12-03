@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Filter, Plus, X } from 'lucide-react'
+import { Filter, Plus, X, User, Thermometer, Phone } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 export interface FilterRule {
@@ -112,9 +112,24 @@ export function FilterPanel({ vendedores, acoes, onFiltersChange }: FilterPanelP
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="vendedor">Vendedor</SelectItem>
-                    <SelectItem value="temperatura">Temperatura</SelectItem>
-                    <SelectItem value="acao">Ação</SelectItem>
+                    <SelectItem value="vendedor">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        Vendedor
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="temperatura">
+                      <div className="flex items-center gap-2">
+                        <Thermometer className="w-4 h-4" />
+                        Temperatura
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="acao">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4" />
+                        Ação
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
 

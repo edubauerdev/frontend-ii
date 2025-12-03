@@ -1,4 +1,12 @@
 // @/lib/whatsapp-types.ts
+
+export interface EtiquetaSimple {
+  id: string
+  nome: string
+  cor: string
+  descricao: string | null
+}
+
 export interface Chat {
   id: string
   name: string
@@ -7,6 +15,21 @@ export interface Chat {
   unreadCount: number
   pictureUrl?: string | null
   profilePic?: string | null
+  // IDs das etiquetas (do banco - array de UUIDs)
+  etiqueta_ids?: string[]
+  // Array de etiquetas resolvidas (com nome e cor)
+  etiquetas?: EtiquetaSimple[]
+}
+
+export interface Etiqueta {
+  id: string
+  nome: string
+  cor: string
+  descricao: string | null
+  created_by_id: string | null
+  created_by_name: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface Message {
