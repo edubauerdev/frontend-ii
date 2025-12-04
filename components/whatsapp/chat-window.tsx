@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Send, RefreshCw, Zap, Loader2, Paperclip, X, User, History, UserPlus, Plus, Tag, Pencil, Tags, StickyNote, Copy, Phone } from "lucide-react"
@@ -34,8 +35,28 @@ const SCROLL_THRESHOLD = 100
 // URL do Backend para Proxy de Imagens/Mídia
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "https://backend-sobt.onrender.com";
 
+// Ícone SVG do CRM (mesmo usado na Sidebar)
+const CRMIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="mr-2"
+  >
+    <path d="M12.034 12.681a.498.498 0 0 1 .647-.647l9 3.5a.5.5 0 0 1-.033.943l-3.444 1.068a1 1 0 0 0-.66.66l-1.067 3.443a.5.5 0 0 1-.943.033z" />
+    <path d="M21 11V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6" />
+  </svg>
+);
+
 interface ChatWindowProps {
   chatId: string
+  chatUuid?: string | null
   chatName?: string | null
   chatPicture?: string | null
   chatTelefone?: string | null
@@ -47,6 +68,7 @@ interface ChatWindowProps {
 
 export function ChatWindow({
   chatId,
+  chatUuid = null,
   chatName: initialChatName,
   chatPicture = null,
   chatTelefone = null,
@@ -57,6 +79,7 @@ export function ChatWindow({
 }: ChatWindowProps) {
   const { getCachedMessages, setCachedMessages, appendMessages, addNewMessage } = useWhatsAppCache()
   const supabase = createClient()
+  const router = useRouter()
 
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState("")
@@ -79,6 +102,9 @@ export function ChatWindow({
   const [roleColor, setRoleColor] = useState<string | null>(null)
   const userDataCache = useRef<Record<string, { nome: string | null; cargo: string | null; color: string | null }>>({})
 
+  // Estado para lead existente
+  const [existingLead, setExistingLead] = useState<{ id: string; nome: string; proximo_contato: string | null } | null>(null)
+
   // Estados locais para nome e etiquetas (atualizados via realtime)
   const [chatName, setChatName] = useState<string | null>(initialChatName || null)
   const [chatEtiquetas, setChatEtiquetas] = useState<EtiquetaSimple[]>(initialEtiquetas)
@@ -99,6 +125,42 @@ export function ChatWindow({
 
   const safeChatName = chatName && chatName.trim().length > 0 ? chatName : chatId || "Contato"
   const profilePictureUrl = `${BACKEND_URL}/chats/avatar/${chatId}`;
+
+  // Verifica se existe lead vinculado ao chat
+  useEffect(() => {
+    async function checkExistingLead() {
+      try {
+        let query = supabase.from("leads").select("id, nome, proximo_contato")
+        
+        if (chatUuid) {
+          query = query.eq("chat_uuid", chatUuid)
+        } else {
+          const telefoneNum = chatId.includes("@") ? chatId.split("@")[0] : chatId
+          query = query.eq("telefone", telefoneNum)
+        }
+        
+        const { data } = await query.limit(1).single()
+        
+        if (data) {
+          setExistingLead(data)
+        } else {
+          setExistingLead(null)
+        }
+      } catch {
+        setExistingLead(null)
+      }
+    }
+    
+    checkExistingLead()
+  }, [chatId, chatUuid, supabase])
+
+  // Função para navegar até o lead no CRM
+  const handleViewLeadInCRM = () => {
+    if (existingLead) {
+      const leadDate = existingLead.proximo_contato || new Date().toISOString().split('T')[0]
+      router.push(`/crm?leadId=${existingLead.id}&date=${leadDate}`)
+    }
+  }
 
   // ----------------------------------------------------
   // --- REALTIME SUBSCRIPTIONS
@@ -541,8 +603,33 @@ export function ChatWindow({
   return (
     <div className="flex flex-col h-full bg-white relative">
       {/* HEADER */}
-      <div className="border-b p-4 flex-shrink-0">
-        <div className="flex items-center justify-between">
+      <div className="border-b flex-shrink-0">
+        {/* Linha 0: Badge de telefone no canto direito */}
+        <div className="flex items-center justify-end px-4 pt-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge 
+                  variant="secondary" 
+                  className="text-xs bg-gray-300 hover:bg-gray-400 text-gray-800 cursor-pointer flex items-center gap-1"
+                  onClick={() => {
+                    navigator.clipboard.writeText(telefone)
+                    toast.success("Telefone copiado!")
+                  }}
+                >
+                  <Phone className="w-3 h-3" />
+                  {telefone}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Copiar telefone</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        
+        {/* Linha 1: Avatar, Nome, Atribuição, Etiquetas, Notas e Botões */}
+        <div className="flex items-center justify-between px-4 pt-1 pb-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <Avatar className="w-10 h-10 flex-shrink-0">
               <AvatarImage 
@@ -550,12 +637,12 @@ export function ChatWindow({
                 alt={safeChatName} 
                 className="object-cover"
               />
-              <AvatarFallback className="bg-gray-400 text-white">
-                <User className="w-5 h-5" />
+              <AvatarFallback className="bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                <User className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-semibold truncate">{safeChatName}</h3>
                 {chatName && chatName.trim() ? (
                   <TooltipProvider>
@@ -587,11 +674,11 @@ export function ChatWindow({
                             <TooltipTrigger asChild>
                               <Badge variant="secondary" className="text-xs flex items-center gap-1 border-2 cursor-context-menu" style={{ backgroundColor: roleColor, color: "#ffffff", borderColor: roleColor }}>
                                 <User className="w-3 h-3" />
-                                {assignedUserName}
+                                {assignedUserName.split(' ')[0]}
                               </Badge>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>Atribuição</p>
+                              <p>{assignedUserName.split(' ')[0]} {assignedUserCargo || ''}</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -611,7 +698,6 @@ export function ChatWindow({
                               const data = await res.json()
                               
                               if (res.ok && data.success) {
-                                // Limpa os estados locais imediatamente
                                 setAssignment(null)
                                 setAssignedUserName(null)
                                 setAssignedUserCargo(null)
@@ -636,10 +722,10 @@ export function ChatWindow({
                   </ContextMenu>
                 )}
                 
-                {/* Exibe múltiplas etiquetas com context menu */}
+                {/* Etiquetas na mesma linha */}
                 {chatEtiquetas && chatEtiquetas.length > 0 && (
-                  <div className="flex items-center gap-1">
-                    {chatEtiquetas.slice(0, 3).map((etiqueta) => (
+                  <>
+                    {chatEtiquetas.map((etiqueta) => (
                       <ContextMenu key={etiqueta.id}>
                         <ContextMenuTrigger asChild>
                           <div>
@@ -651,8 +737,8 @@ export function ChatWindow({
                                     className="text-xs flex items-center gap-1 border text-white cursor-context-menu"
                                     style={{ backgroundColor: etiqueta.cor, borderColor: etiqueta.cor }}
                                   >
-                                    {etiqueta.nome}
                                     <Tag className="w-3 h-3" />
+                                    {etiqueta.nome}
                                   </Badge>
                                 </TooltipTrigger>
                                 <TooltipContent>
@@ -693,16 +779,7 @@ export function ChatWindow({
                         </ContextMenuContent>
                       </ContextMenu>
                     ))}
-                    {chatEtiquetas.length > 3 && (
-                      <Badge 
-                        variant="secondary" 
-                        className="text-xs cursor-pointer hover:bg-secondary/80"
-                        onClick={() => setShowEtiquetasDialog(true)}
-                      >
-                        +{chatEtiquetas.length - 3}
-                      </Badge>
-                    )}
-                  </div>
+                  </>
                 )}
                 
                 {/* Badge de Notas */}
@@ -719,25 +796,6 @@ export function ChatWindow({
           </div>
           <div className="flex items-center gap-2">
              <TooltipProvider>
-                 {/* Badge de telefone */}
-                 <Tooltip>
-                   <TooltipTrigger asChild>
-                     <Badge 
-                       variant="secondary" 
-                       className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 cursor-pointer flex items-center gap-1"
-                       onClick={() => {
-                         navigator.clipboard.writeText(telefone)
-                         toast.success("Telefone copiado!")
-                       }}
-                     >
-                       <Phone className="w-3 h-3" />
-                       {telefone}
-                     </Badge>
-                   </TooltipTrigger>
-                   <TooltipContent>
-                     <p>Copiar telefone</p>
-                   </TooltipContent>
-                 </Tooltip>
                  {hasHistory && (
                     <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" onClick={() => setShowHistoryDialog(true)}><History className="w-4 h-4" /></Button></TooltipTrigger><TooltipContent><p>Histórico</p></TooltipContent></Tooltip>
                  )}
@@ -752,7 +810,25 @@ export function ChatWindow({
                      <TooltipContent><p>Adicionar nome ao contato</p></TooltipContent>
                    </Tooltip>
                  ) : null}
-                 <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" onClick={() => onToggleLeadPanel(!showLeadPanel)}><UserPlus className="w-4 h-4 mr-2" /> Novo Lead</Button></TooltipTrigger><TooltipContent><p>Criar Lead</p></TooltipContent></Tooltip>
+                 {existingLead ? (
+                   <Tooltip>
+                     <TooltipTrigger asChild>
+                       <Button variant="outline" size="sm" onClick={handleViewLeadInCRM}>
+                         <CRMIcon /> Ver Lead
+                       </Button>
+                     </TooltipTrigger>
+                     <TooltipContent><p>Ver lead no CRM</p></TooltipContent>
+                   </Tooltip>
+                 ) : (
+                   <Tooltip>
+                     <TooltipTrigger asChild>
+                       <Button variant="outline" size="sm" onClick={() => onToggleLeadPanel(!showLeadPanel)}>
+                         <UserPlus className="w-4 h-4 mr-2" /> Novo Lead
+                       </Button>
+                     </TooltipTrigger>
+                     <TooltipContent><p>Criar Lead</p></TooltipContent>
+                   </Tooltip>
+                 )}
                  <Tooltip>
                    <TooltipTrigger asChild>
                      <div>

@@ -2,9 +2,11 @@
 
 import { useDraggable } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
+import { useRouter } from "next/navigation"
 import type { Lead } from "@/types/crm"
 import { cn } from "@/lib/utils"
-import { Phone, MessageCircle, MapPin, FileText, RefreshCw, Users, MoreHorizontal, CheckCircle, XCircle, Eye, ArrowRightLeft, Trash2 } from 'lucide-react'
+import { Phone, MessageCircle, MapPin, FileText, RefreshCw, Users, MoreHorizontal, CheckCircle, XCircle, Eye, ArrowRightLeft, Trash2, Pencil } from 'lucide-react'
+import { toast } from "sonner"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -28,13 +30,33 @@ type LeadCardProps = {
   onDelete?: () => void
   onConvert?: () => void
   onUnconvert?: () => void
+  isHighlighted?: boolean
 }
 
-export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, onUnconvert }: LeadCardProps) {
+// Ícone SVG do WhatsApp (mesmo da Sidebar)
+const WhatsAppChatIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="mr-2"
+  >
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+)
+
+export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, onUnconvert, isHighlighted }: LeadCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: lead.id,
   })
   const { user } = useUser()
+  const router = useRouter()
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -127,13 +149,15 @@ export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, o
     <ContextMenu modal={false}>
       <ContextMenuTrigger asChild>
         <div
+          id={`lead-card-${lead.id}`}
           ref={setNodeRef}
           style={style}
           {...attributes}
           className={cn(
             "bg-white rounded-lg p-3 border-2 shadow-sm hover:shadow-md transition-shadow",
             getTemperaturaColor(),
-            isDragging && "opacity-50"
+            isDragging && "opacity-50",
+            isHighlighted && "lead-highlight"
           )}
         >
           <div {...listeners} className="cursor-grab active:cursor-grabbing">
@@ -141,11 +165,7 @@ export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, o
               <Tooltip delayDuration={200}>
                 <TooltipTrigger asChild>
                   <h4 
-                    className="font-semibold text-neutral-900 mb-1 cursor-pointer hover:text-neutral-700 inline-flex items-center gap-1.5"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onClick?.()
-                    }}
+                    className="font-semibold text-neutral-900 mb-1 inline-flex items-center gap-1.5"
                   >
                     <span>{getPrimeiroNome(lead.nome)}</span>
                     {getTemperaturaEmoji()}
@@ -207,6 +227,39 @@ export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, o
           <Eye className="w-4 h-4 mr-2" />
           Ver dados
         </ContextMenuItem>
+        {canEdit && (
+          <ContextMenuItem 
+            onSelect={(e) => {
+              e.preventDefault()
+              onClick?.()
+            }}
+          >
+            <Pencil className="w-4 h-4 mr-2" />
+            Editar lead
+          </ContextMenuItem>
+        )}
+        {lead.chat_uuid && (
+          <ContextMenuItem 
+            onSelect={(e) => {
+              e.preventDefault()
+              router.push(`/whatsapp?chatUuid=${lead.chat_uuid}`)
+            }}
+          >
+            <WhatsAppChatIcon />
+            Ver chat
+          </ContextMenuItem>
+        )}
+        {lead.telefone && !lead.chat_uuid && (
+          <ContextMenuItem 
+            onSelect={(e) => {
+              e.preventDefault()
+              router.push(`/whatsapp?telefone=${lead.telefone}`)
+            }}
+          >
+            <WhatsAppChatIcon />
+            Ver chat
+          </ContextMenuItem>
+        )}
         {canEdit && (
           <>
             <ContextMenuItem 

@@ -375,6 +375,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
             
             return {
               id: c.id,
+              uuid: c.uuid,  // UUID interno estável
               name: c.name,
               lastMessage: c.last_message,
               lastMessageTime: c.last_message_time,
@@ -630,11 +631,11 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                                             <TooltipTrigger asChild>
                                               <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 flex items-center gap-1 border flex-shrink-0 cursor-pointer" style={{ backgroundColor: assignment.assigned_to_color || "#6366f1", color: "#ffffff", borderColor: assignment.assigned_to_color || "#6366f1" }}>
                                                 <User className="w-2.5 h-2.5" />
-                                                <span className="max-w-[80px] truncate">{assignment.assigned_to_name}</span>
+                                                <span className="max-w-[80px] truncate">{assignment.assigned_to_name?.split(' ')[0]}</span>
                                               </Badge>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                              <p>Atribuição</p>
+                                              <p>{assignment.assigned_to_name?.split(' ')[0]} {assignment.assigned_to_cargo || ''}</p>
                                             </TooltipContent>
                                           </Tooltip>
                                         </TooltipProvider>
@@ -927,36 +928,6 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                           <Pencil className="w-4 h-4 mr-2" />
                           Editar nome
                         </ContextMenuItem>
-                        {hasEtiquetas && (
-                          <>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem 
-                              className="text-destructive focus:text-destructive"
-                              onClick={async () => {
-                                try {
-                                  const res = await fetch("/api/whatsapp/assign-tag", {
-                                    method: "DELETE",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ chatId: chat.id })
-                                  })
-                                  if (res.ok) {
-                                    toast.success("Etiquetas removidas")
-                                    // Atualiza local
-                                    setChats(prev => prev.map(c => 
-                                      c.id === chat.id ? { ...c, etiquetas: [] } : c
-                                    ))
-                                    onRefresh?.()
-                                  }
-                                } catch {
-                                  toast.error("Erro ao remover etiquetas")
-                                }
-                              }}
-                            >
-                              <X className="w-4 h-4 mr-2" />
-                              Remover etiquetas
-                            </ContextMenuItem>
-                          </>
-                        )}
                         <ContextMenuSeparator />
                         <ContextMenuItem 
                           onClick={() => {

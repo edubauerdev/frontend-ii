@@ -122,3 +122,16 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Animação de destaque (subir e descer suave) para lead */
+@keyframes highlight-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.lead-highlight {
+  animation: highlight-float 0.8s ease-in-out;
+  animation-iteration-count: 3;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+  border-color: rgb(59, 130, 246) !important;
+}

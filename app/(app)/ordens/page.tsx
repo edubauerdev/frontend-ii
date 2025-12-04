@@ -265,7 +265,7 @@ export default function OrdensPage() {
                             className="inline-flex hover:opacity-70 transition-opacity"
                           >
                             <img
-                              src="/images/google-drive-icon.png"
+                              src="/google_drive.svg"
                               alt="Google Drive"
                               className="w-6 h-6 object-contain"
                             />
@@ -431,7 +431,7 @@ export default function OrdensPage() {
                               className="inline-flex hover:opacity-70 transition-opacity"
                             >
                               <img
-                                src="/images/google-drive-icon.png"
+                                src="/google_drive.svg"
                                 alt="Google Drive"
                                 className="w-5 h-5 object-contain"
                               />

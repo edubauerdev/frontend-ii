@@ -17,6 +17,7 @@ type KanbanColumnProps = {
   onLeadDelete: (lead: Lead) => void
   onLeadConvert?: (lead: Lead) => void
   onLeadUnconvert?: (lead: Lead) => void
+  highlightedLeadId?: string | null
 }
 
 export function KanbanColumn({
@@ -29,6 +30,7 @@ export function KanbanColumn({
   onLeadDelete,
   onLeadConvert,
   onLeadUnconvert,
+  highlightedLeadId,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: dateStr,
@@ -65,6 +67,7 @@ export function KanbanColumn({
             onDelete={() => onLeadDelete(lead)}
             onConvert={() => onLeadConvert?.(lead)}
             onUnconvert={() => onLeadUnconvert?.(lead)}
+            isHighlighted={highlightedLeadId === lead.id}
           />
         ))}
       </div>

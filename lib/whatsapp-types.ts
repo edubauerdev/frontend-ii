@@ -9,6 +9,7 @@ export interface EtiquetaSimple {
 
 export interface Chat {
   id: string
+  uuid?: string  // UUID interno estável
   name: string
   lastMessage: string | null
   lastMessageTime: number | null

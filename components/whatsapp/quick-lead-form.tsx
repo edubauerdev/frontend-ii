@@ -31,12 +31,13 @@ import { cn } from "@/lib/utils"
 
 type QuickLeadFormProps = {
   chatId: string
+  chatUuid?: string | null  // UUID interno estável do chat
   chatName: string
   onSuccess: () => void
   onCancel: () => void
 }
 
-export function QuickLeadForm({ chatId, chatName, onSuccess, onCancel }: QuickLeadFormProps) {
+export function QuickLeadForm({ chatId, chatUuid, chatName, onSuccess, onCancel }: QuickLeadFormProps) {
   const [nome, setNome] = useState(chatName)
   const [cidade, setCidade] = useState("")
   const [interesse, setInteresse] = useState<string[]>([])
@@ -51,8 +52,43 @@ export function QuickLeadForm({ chatId, chatName, onSuccess, onCancel }: QuickLe
   const [acao, setAcao] = useState("")
   const [observacao, setObservacao] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [existingLead, setExistingLead] = useState<{ id: string; nome: string } | null>(null)
+  const [checkingLead, setCheckingLead] = useState(true)
   const { user } = useUser()
   const supabase = createClient()
+
+  // Verifica se já existe lead para este chat
+  useEffect(() => {
+    async function checkExistingLead() {
+      setCheckingLead(true)
+      try {
+        // Busca por chat_uuid (mais confiável) ou telefone
+        let query = supabase.from("leads").select("id, nome")
+        
+        if (chatUuid) {
+          query = query.eq("chat_uuid", chatUuid)
+        } else {
+          // Fallback: busca por telefone
+          const telefoneNum = chatId.includes("@") ? chatId.split("@")[0] : chatId
+          query = query.eq("telefone", telefoneNum)
+        }
+        
+        const { data } = await query.limit(1).single()
+        
+        if (data) {
+          setExistingLead(data)
+        } else {
+          setExistingLead(null)
+        }
+      } catch {
+        setExistingLead(null)
+      } finally {
+        setCheckingLead(false)
+      }
+    }
+    
+    checkExistingLead()
+  }, [chatId, chatUuid, supabase])
 
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, "")
@@ -95,6 +131,12 @@ export function QuickLeadForm({ chatId, chatName, onSuccess, onCancel }: QuickLe
       return
     }
 
+    // Verifica novamente se já existe lead (pode ter sido criado enquanto preenchia)
+    if (existingLead) {
+      toast.error(`Já existe um lead "${existingLead.nome}" vinculado a este chat`)
+      return
+    }
+
     setIsSubmitting(true)
 
     const interesseFormatado = formatInteresse()
@@ -115,6 +157,7 @@ export function QuickLeadForm({ chatId, chatName, onSuccess, onCancel }: QuickLe
       acao: acao.trim() || null,
       observacao: observacao.trim() || null,
       status: "ativo",
+      chat_uuid: chatUuid || null,  // Vincula ao chat pelo UUID estável
     })
 
     if (error) {
@@ -152,15 +195,38 @@ export function QuickLeadForm({ chatId, chatName, onSuccess, onCancel }: QuickLe
   }, [chatId, chatName])
 
   return (
-    <div className="p-6 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 h-full flex flex-col min-h-0">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h2 className="text-2xl font-bold">Novo Lead</h2>
         <Button variant="ghost" size="icon" onClick={onCancel}>
           <X className="h-5 w-5" />
         </Button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto">
+      {/* Alerta se já existe lead vinculado */}
+      {checkingLead ? (
+        <div className="flex items-center gap-2 p-4 mb-4 bg-neutral-100 rounded-lg">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span className="text-sm text-neutral-600">Verificando se já existe lead...</span>
+        </div>
+      ) : existingLead ? (
+        <div className="p-4 mb-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Users className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div>
+              <p className="font-medium text-amber-800">Lead já existe!</p>
+              <p className="text-sm text-amber-700 mt-1">
+                Já existe um lead <strong>"{existingLead.nome}"</strong> vinculado a este chat.
+              </p>
+              <p className="text-xs text-amber-600 mt-2">
+                Para evitar duplicatas, você pode editar o lead existente no banco de dados.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <form onSubmit={handleSubmit} className="space-y-3 flex-1 overflow-y-auto min-h-0 pr-1">
         <div className="space-y-2">
           <Label htmlFor="nome">Nome *</Label>
           <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome do lead" required />
@@ -446,12 +512,14 @@ export function QuickLeadForm({ chatId, chatName, onSuccess, onCancel }: QuickLe
           <Button type="button" variant="outline" onClick={onCancel} className="flex-1 bg-transparent">
             Cancelar
           </Button>
-          <Button type="submit" disabled={isSubmitting} className="flex-1">
+          <Button type="submit" disabled={isSubmitting || checkingLead || !!existingLead} className="flex-1">
             {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Salvando...
               </>
+            ) : existingLead ? (
+              "Lead já existe"
             ) : (
               "Criar Lead"
             )}

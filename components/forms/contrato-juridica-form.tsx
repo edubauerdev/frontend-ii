@@ -697,7 +697,7 @@ export function ContratoJuridicaForm({
             
             <div className="w-20 h-20 relative flex-shrink-0">
               <img 
-                src="/images/google-drive-icon.png"
+                src="/google_drive.svg"
                 alt="Google Drive" 
                 className={`w-full h-full object-contain drop-shadow-lg transition-all duration-500`}
                 style={{ filter: !isLoadingComplete ? 'grayscale(100%)' : 'none' }}

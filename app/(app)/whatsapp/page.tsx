@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { ChatList } from "@/components/whatsapp/chat-list"
 import { ChatWindow } from "@/components/whatsapp/chat-window"
 import { ConnectionStatus } from "@/components/whatsapp/connection-status"
@@ -19,6 +20,10 @@ import { createClient } from "@/lib/supabase/client"
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "https://backend-sobt.onrender.com";
 
 export default function WhatsAppPage() {
+  const searchParams = useSearchParams()
+  const chatUuidParam = searchParams.get("chatUuid")
+  const telefoneParam = searchParams.get("telefone")
+  
   const { selectedChatId, setSelectedChatId, selectedChatName, setSelectedChatName, invalidateChatsCache } =
     useWhatsAppCache()
   const [refreshTrigger, setRefreshTrigger] = useState(0)
@@ -38,6 +43,43 @@ export default function WhatsAppPage() {
       checkStatus()
   }, [supabase])
 
+  // Navegar para o chat quando vem por parâmetro de URL
+  useEffect(() => {
+    async function findAndSelectChat() {
+      if (!isConnected || isChecking) return
+      
+      if (chatUuidParam) {
+        // Busca chat pelo UUID
+        const { data } = await supabase
+          .from("chats")
+          .select("*")
+          .eq("uuid", chatUuidParam)
+          .single()
+        
+        if (data) {
+          handleSelectChat(data as Chat)
+          // Limpa o parâmetro da URL
+          window.history.replaceState({}, '', '/whatsapp')
+        }
+      } else if (telefoneParam) {
+        // Busca chat pelo telefone
+        const { data } = await supabase
+          .from("chats")
+          .select("*")
+          .or(`id.eq.${telefoneParam}@s.whatsapp.net,telefone.eq.${telefoneParam}`)
+          .limit(1)
+          .single()
+        
+        if (data) {
+          handleSelectChat(data as Chat)
+          window.history.replaceState({}, '', '/whatsapp')
+        }
+      }
+    }
+    
+    findAndSelectChat()
+  }, [chatUuidParam, telefoneParam, isConnected, isChecking])
+
   function handleSelectChat(chat: Chat) {
     setSelectedChatId(chat.id)
     const displayName = (chat as any).name ?? (chat as any).pushName ?? chat.id
@@ -55,7 +97,7 @@ export default function WhatsAppPage() {
   }
 
   return (
-    <div className="p-6 h-screen flex flex-col">
+    <div className="p-6 h-screen flex flex-col overflow-hidden">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-balance">WhatsApp Business</h1>
@@ -105,7 +147,7 @@ export default function WhatsAppPage() {
             </Card>
         </div>
       ) : (
-        <div className="flex-1 flex gap-4 min-h-0">
+        <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
             {/* Container 1: Lista de Chats */}
             <Card className="flex flex-col overflow-hidden w-[380px] flex-shrink-0">
             <ChatList
@@ -118,13 +160,12 @@ export default function WhatsAppPage() {
 
             {/* Container 2: Mensagens do Chat */}
             <Card
-            className={`flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
-                showLeadPanel ? "flex-[0.75]" : "flex-1"
-            }`}
+            className="flex flex-col overflow-hidden transition-all duration-300 ease-in-out min-w-0 flex-1"
             >
             {selectedChatId ? (
                 <ChatWindow
                 chatId={selectedChatId}
+                chatUuid={selectedChat?.uuid || null}
                 chatName={selectedChatName}
                 // 🔥 AQUI: Passamos a URL do proxy diretamente para o filho
                 chatPicture={`${BACKEND_URL}/chats/avatar/${selectedChatId}`}
@@ -146,11 +187,12 @@ export default function WhatsAppPage() {
 
             {/* Container 3: Painel de Lead */}
             {showLeadPanel && selectedChatId && (
-            <Card className="flex-[0.25] flex flex-col overflow-hidden transition-all duration-300 ease-in-out animate-in slide-in-from-right-5 fade-in-0">
-                <div className="animate-in fade-in-0 slide-in-from-top-3 duration-500 h-full overflow-y-auto">
+            <Card className="w-[360px] min-w-[320px] max-w-[400px] flex-shrink-0 flex flex-col overflow-hidden transition-all duration-300 ease-in-out animate-in slide-in-from-right-5 fade-in-0">
+                <div className="animate-in fade-in-0 slide-in-from-top-3 duration-500 h-full flex flex-col overflow-hidden">
                 <QuickLeadForm
                     key={selectedChatId}
                     chatId={selectedChatId}
+                    chatUuid={selectedChat?.uuid || null}
                     chatName={selectedChatName}
                     onSuccess={() => {
                     setShowLeadPanel(false)

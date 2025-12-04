@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Plus, ChevronLeft, ChevronRight } from "lucide-react"
+import { Plus, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react"
 import {
   DndContext,
   DragOverlay,
@@ -91,7 +92,18 @@ function subWeeks(date: Date, weeks: number): Date {
 }
 
 export default function CRMPage() {
-  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => startOfWeek(new Date()))
+  const searchParams = useSearchParams()
+  const highlightLeadId = searchParams.get("leadId")
+  const targetDate = searchParams.get("date")
+
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
+    // Se veio uma data por parâmetro, navega para a semana correspondente
+    if (targetDate) {
+      const date = new Date(targetDate + "T00:00:00")
+      return startOfWeek(date)
+    }
+    return startOfWeek(new Date())
+  })
   const [leads, setLeads] = useState<Lead[]>([])
   const [activeFilters, setActiveFilters] = useState<FilterRule[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -102,6 +114,8 @@ export default function CRMPage() {
   const [deletingLead, setDeletingLead] = useState<Lead | null>(null)
   const [convertingLead, setConvertingLead] = useState<Lead | null>(null)
   const [unconvertingLead, setUnconvertingLead] = useState<Lead | null>(null)
+  const [highlightedLeadId, setHighlightedLeadId] = useState<string | null>(null)
+  const [onlyMyLeads, setOnlyMyLeads] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const kanbanContainerRef = useRef<HTMLDivElement>(null)
   const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -118,6 +132,45 @@ export default function CRMPage() {
       },
     }),
   )
+
+  // Efeito para destacar o lead quando vem por URL
+  useEffect(() => {
+    if (highlightLeadId) {
+      // Aguarda os leads carregarem e então destaca
+      const timer = setTimeout(() => {
+        setHighlightedLeadId(highlightLeadId)
+        
+        // Scroll até o elemento
+        const element = document.getElementById(`lead-card-${highlightLeadId}`)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 500)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [highlightLeadId, leads])
+
+  // Remove o destaque ao clicar em qualquer lugar
+  useEffect(() => {
+    if (!highlightedLeadId) return
+
+    const handleClick = () => {
+      setHighlightedLeadId(null)
+      // Limpa os parâmetros da URL sem recarregar a página
+      window.history.replaceState({}, '', '/crm')
+    }
+
+    // Aguarda um pouco antes de adicionar o listener para não remover imediatamente
+    const timer = setTimeout(() => {
+      document.addEventListener('click', handleClick)
+    }, 100)
+
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('click', handleClick)
+    }
+  }, [highlightedLeadId])
 
   const fetchLeads = async () => {
     const weekEnd = addDays(currentWeekStart, 6)
@@ -229,9 +282,17 @@ export default function CRMPage() {
   )
 
   const filteredLeads = useMemo(() => {
-    if (activeFilters.length === 0) return leads
+    let filtered = leads
+    
+    // Filtro "Apenas meus leads"
+    if (onlyMyLeads && user) {
+      filtered = filtered.filter((lead) => lead.adicionado_por_id === user.id)
+    }
+    
+    // Filtros do painel
+    if (activeFilters.length === 0) return filtered
 
-    return leads.filter((lead) => {
+    return filtered.filter((lead) => {
       return activeFilters.every((filter) => {
         if (filter.type === "vendedor") {
           return lead.adicionado_por_nome === filter.value
@@ -245,7 +306,7 @@ export default function CRMPage() {
         return true
       })
     })
-  }, [leads, activeFilters])
+  }, [leads, activeFilters, onlyMyLeads, user])
 
   const uniqueVendedores = useMemo(() => {
     return Array.from(new Set(leads.map((l) => l.adicionado_por_nome))).sort()
@@ -301,7 +362,12 @@ export default function CRMPage() {
       return
     }
 
-    const dataAntigaFormatada = formatDate(parseDateFromDB(lead.proximo_contato), "dd/MM/yyyy (EEEE)")
+    if (!currentDate) {
+      setActiveId(null)
+      return
+    }
+
+    const dataAntigaFormatada = formatDate(parseDateFromDB(currentDate), "dd/MM/yyyy (EEEE)")
     const dataNovaFormatada = formatDate(parseDateFromDB(newDate), "dd/MM/yyyy (EEEE)")
 
     setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, proximo_contato: newDate } : l)))
@@ -311,7 +377,7 @@ export default function CRMPage() {
     if (updateError) {
       console.error("Error updating lead:", updateError)
       toast.error("Erro ao mover lead")
-      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, proximo_contato: lead.proximo_contato } : l)))
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, proximo_contato: currentDate } : l)))
       setActiveId(null)
       return
     }
@@ -321,7 +387,7 @@ export default function CRMPage() {
       usuario_id: user.id,
       usuario_nome: user.nome,
       acao: "movido",
-      de_data: lead.proximo_contato,
+      de_data: currentDate,
       para_data: newDate,
       detalhes: `Lead movido de ${dataAntigaFormatada} para ${dataNovaFormatada}`,
     })
@@ -382,6 +448,15 @@ export default function CRMPage() {
           <p className="text-muted-foreground mt-1">Gerenciamento de leads semanais</p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant={onlyMyLeads ? "default" : "outline"}
+            size="sm"
+            onClick={() => setOnlyMyLeads(!onlyMyLeads)}
+            className="gap-2"
+          >
+            {onlyMyLeads ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            Apenas meus leads
+          </Button>
           <FilterPanel vendedores={uniqueVendedores} acoes={uniqueAcoes} onFiltersChange={setActiveFilters} />
           <Button onClick={() => setIsNewLeadOpen(true)} className="gap-2">
             <Plus className="w-4 h-4" />
@@ -433,6 +508,7 @@ export default function CRMPage() {
                 onLeadDelete={setDeletingLead}
                 onLeadConvert={handleConvertLead}
                 onLeadUnconvert={handleUnconvertLead}
+                highlightedLeadId={highlightedLeadId}
               />
             )
           })}
@@ -461,7 +537,17 @@ export default function CRMPage() {
         onSuccess={fetchLeads}
       />
 
-      <ViewLeadDialog open={!!viewingLead} onOpenChange={(open) => !open && setViewingLead(null)} lead={viewingLead} />
+      <ViewLeadDialog 
+        open={!!viewingLead} 
+        onOpenChange={(open) => !open && setViewingLead(null)} 
+        lead={viewingLead}
+        onEdit={() => {
+          if (viewingLead) {
+            setViewingLead(null)
+            setEditingLead(viewingLead)
+          }
+        }}
+      />
 
       <MoveLeadDialog
         open={!!movingLead}

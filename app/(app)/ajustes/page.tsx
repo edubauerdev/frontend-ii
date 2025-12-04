@@ -1883,7 +1883,7 @@ export default function AjustesPage() {
                             />
                           ) : (
                             <img
-                              src="/images/google-drive-icon.png"
+                              src="/google_drive.svg"
                               alt="Google Drive"
                               className="w-full h-full object-contain"
                             />

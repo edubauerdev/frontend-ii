@@ -1,11 +1,1 @@
-{
-  "[project]/frontend-ii/components/whatsapp/chat-window.tsx [app-client] (ecmascript, next/dynamic entry)": {
-    "id": "[project]/frontend-ii/components/whatsapp/chat-window.tsx [app-client] (ecmascript, next/dynamic entry)",
-    "files": [
-      "static/chunks/frontend-ii_lib_supabase_client_ts_d56d1541._.js",
-      "static/chunks/frontend-ii_2c6a8f09._.js",
-      "static/chunks/ead89_8c689d63._.js",
-      "static/chunks/frontend-ii_components_whatsapp_chat-window_tsx_26b953a4._.js"
-    ]
-  }
-}
+{}

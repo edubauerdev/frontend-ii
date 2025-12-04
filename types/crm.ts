@@ -14,6 +14,7 @@ export interface Lead {
   acao: string | null
   observacao: string | null
   status: "ativo" | "convertido" | null
+  chat_uuid: string | null  // UUID interno do chat vinculado
   created_at: string
   updated_at: string
 }

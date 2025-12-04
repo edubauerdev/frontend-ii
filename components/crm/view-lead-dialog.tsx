@@ -1,28 +1,154 @@
 "use client"
 
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Coffee, Flame, Calendar, Phone, MapPin, Target, FileText } from 'lucide-react'
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Calendar, Phone, MapPin, Target, FileText, History, StickyNote, Pencil, Tag, MessageSquare, Loader2 } from 'lucide-react'
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { createClient } from "@/lib/supabase/client"
 import type { Lead } from "@/types/crm"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MessageSquare } from 'lucide-react'
-import dynamic from 'next/dynamic'
+import { toast } from "sonner"
 
-const ChatWindow = dynamic(
-  () => import('@/components/whatsapp/chat-window').then(mod => ({ default: mod.ChatWindow })),
-  { ssr: false }
+// Ícone SVG do WhatsApp
+const WhatsAppIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
 )
+
+type EtiquetaSimple = {
+  id: string
+  nome: string
+  cor: string
+}
+
+type LeadLog = {
+  id: string
+  acao: string
+  usuario_nome: string
+  detalhes: string | null
+  campo_alterado: string | null
+  valor_antigo: string | null
+  valor_novo: string | null
+  created_at: string
+}
 
 type ViewLeadDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   lead: Lead | null
+  onEdit?: () => void
 }
 
-export function ViewLeadDialog({ open, onOpenChange, lead }: ViewLeadDialogProps) {
+export function ViewLeadDialog({ open, onOpenChange, lead, onEdit }: ViewLeadDialogProps) {
+  const router = useRouter()
+  const supabase = createClient()
+  const [etiquetas, setEtiquetas] = useState<EtiquetaSimple[]>([])
+  const [logs, setLogs] = useState<LeadLog[]>([])
+  const [notas, setNotas] = useState<string>("")
+  const [showHistory, setShowHistory] = useState(false)
+  const [showNotes, setShowNotes] = useState(false)
+  const [loadingLogs, setLoadingLogs] = useState(false)
+
+  useEffect(() => {
+    if (open && lead) {
+      loadEtiquetas()
+      setShowHistory(false)
+      setShowNotes(false)
+    }
+  }, [open, lead])
+
+  const loadEtiquetas = async () => {
+    if (!lead?.chat_uuid) return
+    
+    try {
+      // Buscar etiquetas do chat vinculado
+      const { data: chatData } = await supabase
+        .from('chats')
+        .select('etiqueta_ids')
+        .eq('uuid', lead.chat_uuid)
+        .single()
+      
+      if (chatData?.etiqueta_ids && chatData.etiqueta_ids.length > 0) {
+        const { data: etiquetasData } = await supabase
+          .from('whatsapp_etiquetas')
+          .select('id, nome, cor')
+          .in('id', chatData.etiqueta_ids)
+        
+        setEtiquetas(etiquetasData || [])
+      } else {
+        setEtiquetas([])
+      }
+    } catch (err) {
+      console.error("Erro ao carregar etiquetas:", err)
+    }
+  }
+
+  const loadLogs = async () => {
+    if (!lead) return
+    setLoadingLogs(true)
+    
+    try {
+      const { data, error } = await supabase
+        .from('lead_logs')
+        .select('*')
+        .eq('lead_id', lead.id)
+        .order('created_at', { ascending: false })
+      
+      if (error) throw error
+      setLogs(data || [])
+    } catch (err) {
+      console.error("Erro ao carregar histórico:", err)
+      toast.error("Erro ao carregar histórico")
+    } finally {
+      setLoadingLogs(false)
+    }
+  }
+
+  const handleShowHistory = () => {
+    setShowHistory(true)
+    setShowNotes(false)
+    loadLogs()
+  }
+
+  const handleShowNotes = () => {
+    setShowNotes(true)
+    setShowHistory(false)
+    setNotas(lead?.observacao || "")
+  }
+
+  const handleVerChat = () => {
+    if (!lead) return
+    
+    if (lead.chat_uuid) {
+      router.push(`/whatsapp?chatUuid=${lead.chat_uuid}`)
+    } else if (lead.telefone) {
+      router.push(`/whatsapp?telefone=${lead.telefone}`)
+    }
+    onOpenChange(false)
+  }
+
+  const handleEdit = () => {
+    onOpenChange(false)
+    onEdit?.()
+  }
+
   if (!lead) return null
 
   const getTemperaturaIcon = () => {
@@ -48,126 +174,234 @@ export function ViewLeadDialog({ open, onOpenChange, lead }: ViewLeadDialogProps
     }
   }
 
-  const getChatId = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, '')
-    const formatted = cleaned.startsWith('55') ? cleaned : '55' + cleaned
-    return formatted + '@c.us'
+  // Mostrar histórico
+  if (showHistory) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[550px] max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5" />
+              Histórico do Lead
+            </DialogTitle>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[60vh] pr-4">
+            {loadingLogs ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : logs.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhum registro de histórico
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {logs.map((log) => (
+                  <div key={log.id} className="p-3 bg-neutral-50 rounded-lg border">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium text-sm">{log.acao}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {format(parseISO(log.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">por {log.usuario_nome}</p>
+                    {log.detalhes && (
+                      <p className="text-sm mt-1">{log.detalhes}</p>
+                    )}
+                    {log.campo_alterado && (
+                      <p className="text-xs mt-1 text-neutral-600">
+                        <span className="font-medium">{log.campo_alterado}:</span>{" "}
+                        <span className="text-red-500 line-through">{log.valor_antigo || "vazio"}</span>{" "}
+                        → <span className="text-green-600">{log.valor_novo || "vazio"}</span>
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+          
+          <div className="flex gap-2 pt-4">
+            <Button variant="outline" onClick={() => setShowHistory(false)} className="flex-1">
+              Voltar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
   }
 
+  // Mostrar notas
+  if (showNotes) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[550px] max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <StickyNote className="w-5 h-5" />
+              Observação do Lead
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {lead.observacao ? (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm whitespace-pre-wrap">{lead.observacao}</p>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhuma observação registrada
+              </div>
+            )}
+          </div>
+          
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowNotes(false)} className="flex-1">
+              Voltar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  // Tela principal de detalhes
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[650px] max-h-[90vh]">
+      <DialogContent className="sm:max-w-[550px] max-h-[85vh]">
         <DialogHeader>
           <DialogTitle>Detalhes do Lead</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="detalhes" className="flex-1">
-          <TabsList className="w-full">
-            <TabsTrigger value="detalhes" className="flex-1">
-              Detalhes
-            </TabsTrigger>
-            {lead.telefone && (
-              <TabsTrigger value="whatsapp" className="flex-1 gap-2">
-                <MessageSquare className="w-4 h-4" />
-                WhatsApp
-              </TabsTrigger>
-            )}
-          </TabsList>
+        <ScrollArea className="max-h-[65vh] pr-4">
+          <div className="space-y-4">
+            {/* Cabeçalho com nome e etiquetas */}
+            <div className="bg-neutral-50 p-4 rounded-lg">
+              <h3 className="text-2xl font-bold text-neutral-900 mb-1">{lead.nome}</h3>
+              <p className="text-sm text-neutral-500">Adicionado por {lead.adicionado_por_nome}</p>
+              
+              {/* Etiquetas */}
+              {etiquetas.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {etiquetas.map((etiqueta) => (
+                    <Badge
+                      key={etiqueta.id}
+                      className="text-xs flex items-center gap-1 text-white"
+                      style={{ backgroundColor: etiqueta.cor }}
+                    >
+                      <Tag className="w-3 h-3" />
+                      {etiqueta.nome}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          <TabsContent value="detalhes" className="mt-4">
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-              <div className="bg-neutral-50 p-4 rounded-lg">
-                <h3 className="text-2xl font-bold text-neutral-900 mb-1">{lead.nome}</h3>
-                <p className="text-sm text-neutral-500">Adicionado por {lead.adicionado_por_nome}</p>
-              </div>
+            {/* Botões de ação */}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={handleShowHistory} className="gap-2">
+                <History className="w-4 h-4" />
+                Histórico
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleShowNotes} className="gap-2">
+                <StickyNote className="w-4 h-4" />
+                Notas
+              </Button>
+              {onEdit && (
+                <Button variant="outline" size="sm" onClick={handleEdit} className="gap-2">
+                  <Pencil className="w-4 h-4" />
+                  Editar
+                </Button>
+              )}
+              {(lead.chat_uuid || lead.telefone) && (
+                <Button variant="outline" size="sm" onClick={handleVerChat} className="gap-2">
+                  <WhatsAppIcon />
+                  Ver chat
+                </Button>
+              )}
+            </div>
 
-              <div className="grid gap-4">
-                {lead.telefone && (
-                  <div className="flex items-start gap-3">
-                    <Phone className="w-5 h-5 text-neutral-400 mt-0.5" />
-                    <div className="flex-1">
-                      <Label className="text-xs text-neutral-500">Telefone</Label>
-                      <p className="text-sm font-medium">{lead.telefone}</p>
-                    </div>
-                  </div>
-                )}
+            <Separator />
 
-                {lead.endereco && (
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-neutral-400 mt-0.5" />
-                    <div className="flex-1">
-                      <Label className="text-xs text-neutral-500">Endereço</Label>
-                      <p className="text-sm font-medium">{lead.endereco}</p>
-                    </div>
-                  </div>
-                )}
-
+            {/* Informações do lead */}
+            <div className="grid gap-4">
+              {lead.telefone && (
                 <div className="flex items-start gap-3">
-                  {getTemperaturaIcon()}
+                  <Phone className="w-5 h-5 text-neutral-400 mt-0.5" />
                   <div className="flex-1">
-                    <Label className="text-xs text-neutral-500">Temperatura</Label>
-                    <p className="text-sm font-medium">{lead.temperatura}</p>
+                    <Label className="text-xs text-neutral-500">Telefone</Label>
+                    <p className="text-sm font-medium">{lead.telefone}</p>
                   </div>
                 </div>
+              )}
 
-                {lead.proximo_contato && (
-                  <div className="flex items-start gap-3">
-                    <Calendar className="w-5 h-5 text-neutral-400 mt-0.5" />
-                    <div className="flex-1">
-                      <Label className="text-xs text-neutral-500">Próximo Contato</Label>
-                      <p className="text-sm font-medium">
-                        {format(parseISO(lead.proximo_contato), "PPP", { locale: ptBR })}
-                      </p>
-                    </div>
+              {lead.endereco && (
+                <div className="flex items-start gap-3">
+                  <MapPin className="w-5 h-5 text-neutral-400 mt-0.5" />
+                  <div className="flex-1">
+                    <Label className="text-xs text-neutral-500">Endereço</Label>
+                    <p className="text-sm font-medium">{lead.endereco}</p>
                   </div>
-                )}
+                </div>
+              )}
 
-                {lead.acao && (
-                  <div className="flex items-start gap-3">
-                    <Target className="w-5 h-5 text-neutral-400 mt-0.5" />
-                    <div className="flex-1">
-                      <Label className="text-xs text-neutral-500">Ação</Label>
-                      <p className="text-sm font-medium">{lead.acao}</p>
-                    </div>
-                  </div>
-                )}
-
-                {lead.observacao && (
-                  <div className="flex items-start gap-3">
-                    <FileText className="w-5 h-5 text-neutral-400 mt-0.5" />
-                    <div className="flex-1">
-                      <Label className="text-xs text-neutral-500">Observação</Label>
-                      <p className="text-sm font-medium whitespace-pre-wrap">{lead.observacao}</p>
-                    </div>
-                  </div>
-                )}
+              <div className="flex items-start gap-3">
+                {getTemperaturaIcon()}
+                <div className="flex-1">
+                  <Label className="text-xs text-neutral-500">Temperatura</Label>
+                  <p className="text-sm font-medium">{lead.temperatura}</p>
+                </div>
               </div>
 
-              <div className="bg-neutral-50 p-3 rounded-lg text-xs text-neutral-500">
-                <p>Criado em {format(parseISO(lead.created_at), "PPP 'às' HH:mm", { locale: ptBR })}</p>
-                {lead.updated_at !== lead.created_at && (
-                  <p className="mt-1">Atualizado em {format(parseISO(lead.updated_at), "PPP 'às' HH:mm", { locale: ptBR })}</p>
-                )}
-              </div>
+              {lead.proximo_contato && (
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-5 h-5 text-neutral-400 mt-0.5" />
+                  <div className="flex-1">
+                    <Label className="text-xs text-neutral-500">Próximo Contato</Label>
+                    <p className="text-sm font-medium">
+                      {format(parseISO(lead.proximo_contato), "PPP", { locale: ptBR })}
+                    </p>
+                  </div>
+                </div>
+              )}
 
-              <Button onClick={() => onOpenChange(false)} className="w-full">
-                Fechar
-              </Button>
+              {lead.acao && (
+                <div className="flex items-start gap-3">
+                  <Target className="w-5 h-5 text-neutral-400 mt-0.5" />
+                  <div className="flex-1">
+                    <Label className="text-xs text-neutral-500">Ação</Label>
+                    <p className="text-sm font-medium">{lead.acao}</p>
+                  </div>
+                </div>
+              )}
+
+              {lead.observacao && (
+                <div className="flex items-start gap-3">
+                  <FileText className="w-5 h-5 text-neutral-400 mt-0.5" />
+                  <div className="flex-1">
+                    <Label className="text-xs text-neutral-500">Observação</Label>
+                    <p className="text-sm font-medium whitespace-pre-wrap line-clamp-3">{lead.observacao}</p>
+                  </div>
+                </div>
+              )}
             </div>
-          </TabsContent>
 
-          {lead.telefone && (
-            <TabsContent value="whatsapp" className="mt-4">
-              <div className="h-[60vh] border rounded-lg overflow-hidden">
-                <ChatWindow
-                  chatId={getChatId(lead.telefone)}
-                  chatName={lead.nome}
-                  onRefresh={() => {}}
-                />
-              </div>
-            </TabsContent>
-          )}
-        </Tabs>
+            {/* Timestamps */}
+            <div className="bg-neutral-50 p-3 rounded-lg text-xs text-neutral-500">
+              <p>Criado em {format(parseISO(lead.created_at), "PPP 'às' HH:mm", { locale: ptBR })}</p>
+              {lead.updated_at !== lead.created_at && (
+                <p className="mt-1">Atualizado em {format(parseISO(lead.updated_at), "PPP 'às' HH:mm", { locale: ptBR })}</p>
+              )}
+            </div>
+          </div>
+        </ScrollArea>
+
+        <div className="pt-4">
+          <Button onClick={() => onOpenChange(false)} className="w-full">
+            Fechar
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
