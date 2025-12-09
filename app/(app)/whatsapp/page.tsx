@@ -16,11 +16,14 @@ import { toast } from "sonner"
 import { NewContactDialog } from "@/components/whatsapp/new-contact-dialog"
 import type { Chat } from "@/lib/whatsapp-types"
 import { createClient } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
+import { useSidebar } from "@/contexts/sidebar-context"
 
 // URL do Backend (Proxy de Imagens)
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "https://backend-sobt.onrender.com";
 
 export default function WhatsAppPage() {
+  const { isCollapsed } = useSidebar();
   const searchParams = useSearchParams()
   const chatUuidParam = searchParams.get("chatUuid")
   const telefoneParam = searchParams.get("telefone")
@@ -142,12 +145,10 @@ export default function WhatsAppPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-balance">WhatsApp Business</h1>
-          <p className="text-muted-foreground mt-1">Gerencie suas conversas do WhatsApp</p>
         </div>
         
         {(isConnected || isSyncing) && (
-            <div className="flex flex-col gap-2">
-            <ConnectionStatus onStatusChange={setIsConnected} />
+            <div className="flex items-center gap-3 justify-end">
             {isConnected && (
                 <NewContactDialog
                     onContactCreated={(chatId) => {
@@ -159,6 +160,7 @@ export default function WhatsAppPage() {
                     }}
                 />
             )}
+            <ConnectionStatus onStatusChange={setIsConnected} />
             </div>
         )}
       </div>
@@ -206,12 +208,13 @@ export default function WhatsAppPage() {
       ) : (
         <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
             {/* Container 1: Lista de Chats */}
-            <Card className="flex flex-col overflow-hidden w-[380px] flex-shrink-0">
+            <Card className={cn("flex flex-col overflow-hidden flex-shrink-0 transition-all duration-300", showLeadPanel && !isCollapsed ? "w-[220px] min-w-[180px] max-w-[240px]" : "w-[380px] min-w-[320px] max-w-[400px]") }>
             <ChatList
-                ref={chatListRef}
-                onSelectChat={handleSelectChat}
-                selectedChatId={selectedChatId}
-                refreshTrigger={refreshTrigger}
+              ref={chatListRef}
+              onSelectChat={handleSelectChat}
+              selectedChatId={selectedChatId}
+              refreshTrigger={refreshTrigger}
+              shrink={showLeadPanel && !isCollapsed}
             />
             </Card>
 

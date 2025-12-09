@@ -19,7 +19,7 @@ function AppLayoutContent({
       <Sidebar />
       <main
         className="flex-1 transition-all duration-300 ease-in-out"
-        style={{ marginLeft: isCollapsed ? "88px" : "280px" }}
+        style={{ marginLeft: isCollapsed ? "60px" : "184px" }}
       >
         {children}
       </main>

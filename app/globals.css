@@ -39,6 +39,25 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+  /* Scrollbar color: primary, smaller height */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--background);
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-color: var(--primary) var(--background);
+    scrollbar-width: thin;
+  }
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -118,9 +137,86 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    font-size: 12px; /* Reduz a escala base de 16px para 12px (~75%) */
+  }
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* === CURSORES PERSONALIZADOS - Devem ficar FORA das layers para máxima prioridade === */
+
+/* Cursor padrão para tudo */
+*,
+*::before,
+*::after,
+html,
+body {
+  cursor: url('/cursor.svg') 2 2, auto !important;
+}
+
+/* Cursor pointer (mão) para elementos clicáveis */
+a,
+a *,
+a svg,
+button,
+button *,
+button svg,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+summary,
+label,
+[role="button"],
+[role="button"] *,
+[role="button"] svg,
+[role="menuitem"],
+[role="option"],
+[role="tab"],
+[role="checkbox"],
+[role="switch"],
+[role="link"],
+[tabindex]:not([tabindex="-1"]),
+[data-radix-collection-item],
+.cursor-pointer,
+.clickable,
+.lead-card,
+.lead-card *,
+nav a,
+nav a *,
+nav a svg,
+nav button,
+nav button *,
+nav button svg,
+aside a,
+aside a *,
+aside a svg,
+aside button,
+aside button *,
+aside button svg {
+  cursor: url('/mao-pointer.svg') 6 0, pointer !important;
+}
+
+/* Cursor grab APENAS quando estiver arrastando um lead-card */
+.lead-card.dragging,
+.lead-card.dragging *,
+.lead-card.opacity-50,
+.lead-card.opacity-50 *,
+.lead-card[style*="translate"],
+.lead-card[style*="translate"] * {
+  cursor: url('/grab.svg') 10 10, grabbing !important;
+}
+
+/* Ocultar tooltips durante arrasto */
+.lead-card.dragging [data-radix-tooltip-trigger],
+.lead-card.dragging [role="tooltip"],
+.lead-card[style*="transform"] [data-radix-tooltip-trigger],
+.lead-card[style*="transform"] [role="tooltip"] {
+  pointer-events: none;
 }
 
 /* Animação de destaque (subir e descer suave) para lead */
@@ -195,4 +291,54 @@
 .animate-blink-3 {
   animation: blink 0.8s ease-in-out infinite;
   animation-delay: 0.6s;
+}
+
+/* Animação da linha azul surgindo da esquerda para direita no chat selecionado */
+@keyframes border-slide {
+  0% {
+    border-left-width: 0;
+    border-left-color: transparent;
+  }
+  100% {
+    border-left-width: 4px;
+    border-left-color: var(--primary);
+  }
+}
+
+.animate-border-slide {
+  animation: border-slide 0.08s ease-out forwards;
+}
+
+/* Cursor texto para campos editáveis e conteúdo de texto */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="number"],
+textarea,
+[contenteditable="true"],
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+input[type="tel"]:focus,
+input[type="url"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+[contenteditable="true"]:focus {
+  cursor: url('/select-text.svg') 8 8, text !important;
+  caret-color: var(--primary);
+}
+
+/* Cursor texto durante seleção ativa (mousedown em campos de texto) */
+input:active,
+textarea:active,
+[contenteditable="true"]:active,
+p::selection,
+span::selection,
+div::selection,
+*::selection {
+  cursor: url('/select-text.svg') 8 8, text !important;
 }

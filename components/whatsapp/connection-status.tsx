@@ -113,7 +113,7 @@ export function ConnectionStatus({ onStatusChange }: ConnectionStatusProps) {
 
   if (state.loading) {
     return (
-      <Badge variant="outline" className="gap-1 text-muted-foreground border-muted rounded-sm">
+      <Badge variant="outline" className="gap-1 text-muted-foreground border-muted rounded-md">
         <Loader2 className="w-3 h-3 animate-spin" />
         <span className="hidden sm:inline">Verificando...</span>
       </Badge>
@@ -129,7 +129,7 @@ export function ConnectionStatus({ onStatusChange }: ConnectionStatusProps) {
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Badge variant="default" className="gap-2 cursor-help bg-green-600 hover:bg-green-700 px-3 py-1 text-xs font-medium rounded-sm">
+            <Badge variant="default" className="gap-2 cursor-help bg-green-600 hover:bg-green-700 px-3 py-1 text-xs font-medium">
               {isSyncing ? (
                 <Radio className="w-3.5 h-3.5 animate-pulse" />
               ) : (
@@ -157,7 +157,7 @@ export function ConnectionStatus({ onStatusChange }: ConnectionStatusProps) {
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Badge variant="outline" className="gap-2 cursor-help border-yellow-500 text-yellow-600 bg-yellow-50 text-xs rounded-sm">
+            <Badge variant="outline" className="gap-2 cursor-help border-yellow-500 text-yellow-600 bg-yellow-50 text-xs">
               <QrCode className="w-3.5 h-3.5" />
               <span>Aguardando Leitura</span>
             </Badge>
@@ -175,7 +175,7 @@ export function ConnectionStatus({ onStatusChange }: ConnectionStatusProps) {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge variant="destructive" className="gap-1.5 cursor-help text-xs rounded-sm">
+          <Badge variant="destructive" className="gap-1.5 cursor-help text-xs">
             <Unplug className="w-3.5 h-3.5" />
             <span>Desconectado</span>
           </Badge>

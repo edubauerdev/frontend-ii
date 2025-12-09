@@ -161,7 +161,7 @@ export function AssignmentHistoryDialog({ open, onOpenChange, chatId, chatName }
                                 </p>
                               )}
                           </div>
-                          <Badge variant="outline" className="text-xs whitespace-nowrap rounded-sm">
+                          <Badge variant="outline" className="text-xs whitespace-nowrap rounded-md">
                             {formatDistanceToNow(new Date(log.created_at), {
                               addSuffix: true,
                               locale: ptBR,

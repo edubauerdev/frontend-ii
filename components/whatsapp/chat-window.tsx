@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Send, RefreshCw, Zap, Loader2, Paperclip, X, User, History, UserPlus, Plus, Tag, Pencil, Tags, NotepadText, Copy, Phone } from "lucide-react"
+import { Send, RefreshCw, Zap, Loader2, Paperclip, X, User, History, UserPlus, Plus, Tag, Pencil, Tags, StickyNote, Copy, Phone } from "lucide-react"
 import { QuickRepliesPanel } from "./quick-replies-panel"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -748,13 +748,13 @@ export function ChatWindow({
       {/* HEADER */}
       <div className="border-b flex-shrink-0">
         {/* Linha 0: Badge de telefone no canto direito */}
-        <div className="flex items-center justify-end px-4 pt-2">
+        <div className="flex items-center justify-end px-4 pt-2 pb-2">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge 
                   variant="secondary" 
-                  className="text-xs bg-gray-300 hover:bg-gray-400 text-gray-800 cursor-pointer flex items-center gap-1 rounded-sm"
+                  className="text-xs bg-gray-300 hover:bg-gray-400 text-gray-800 cursor-pointer flex items-center gap-1 rounded-md"
                   onClick={() => {
                     navigator.clipboard.writeText(telefone)
                     toast.success("Telefone copiado!")
@@ -823,7 +823,7 @@ export function ChatWindow({
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Badge variant="secondary" className="text-xs flex items-center gap-1 border cursor-context-menu rounded-sm" style={{ backgroundColor: roleColor, color: "#ffffff", borderColor: roleColor }}>
+                              <Badge variant="secondary" className="text-xs h-6 px-2 flex items-center gap-1 cursor-context-menu rounded-md" style={{ backgroundColor: roleColor, color: "#ffffff", borderColor: roleColor }}>
                                 <User className="w-3 h-3" />
                                 {assignedUserName.split(' ')[0]}
                               </Badge>
@@ -887,7 +887,7 @@ export function ChatWindow({
                                   <TooltipTrigger asChild>
                                     <Badge
                                       variant="secondary"
-                                      className="text-xs flex items-center gap-1 border cursor-context-menu rounded-sm"
+                                      className="text-xs h-6 px-2 flex items-center gap-1 cursor-context-menu rounded-md"
                                       style={{ backgroundColor: etiqueta.cor, borderColor: etiqueta.cor, color: getContrastTextColor(etiqueta.cor) }}
                                     >
                                       <Tag className="w-3 h-3" />
@@ -939,10 +939,10 @@ export function ChatWindow({
                           <TooltipTrigger asChild>
                             <Badge 
                               variant="secondary" 
-                              className="text-xs flex items-center gap-1 cursor-pointer text-white bg-gray-800 hover:bg-gray-700 rounded-sm"
+                              className="text-xs px-2 h-6 flex items-center gap-1 cursor-pointer rounded-md bg-neutral-600 text-white border-neutral-600"
                               onClick={() => setShowEtiquetasDialog(true)}
                             >
-                              <Tag className="w-3 h-3 text-white" />
+                              <Tag className="w-3 h-3" />
                               {chatEtiquetas.length}
                             </Badge>
                           </TooltipTrigger>
@@ -952,7 +952,7 @@ export function ChatWindow({
                                 <Badge
                                   key={etiqueta.id}
                                   variant="secondary"
-                                  className="text-xs px-2 py-0.5 flex items-center gap-1 border rounded-sm"
+                                  className="text-xs px-2 py-0.5 flex items-center gap-1 rounded-md"
                                   style={{ 
                                     backgroundColor: etiqueta.cor, 
                                     borderColor: etiqueta.cor, 
@@ -986,12 +986,12 @@ export function ChatWindow({
           <div className="flex items-center gap-2">
              <TooltipProvider>
                  {hasHistory && (
-                    <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" onClick={() => setShowHistoryDialog(true)}><History className="w-4 h-4" /></Button></TooltipTrigger><TooltipContent><p>Histórico</p></TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" className="h-9" onClick={() => setShowHistoryDialog(true)}><History className="w-4 h-4" /></Button></TooltipTrigger><TooltipContent><p>Histórico</p></TooltipContent></Tooltip>
                  )}
                  {!chatName || !chatName.trim() ? (
                    <Tooltip>
                      <TooltipTrigger asChild>
-                       <Button variant="outline" size="sm" onClick={() => setShowEditNameDialog(true)}>
+                       <Button variant="outline" size="sm" className="h-9" onClick={() => setShowEditNameDialog(true)}>
                          <Plus className="w-4 h-4 mr-2" /> Adicionar Nome
                        </Button>
                      </TooltipTrigger>
@@ -1001,7 +1001,7 @@ export function ChatWindow({
                  {existingLead ? (
                    <Tooltip>
                      <TooltipTrigger asChild>
-                       <Button variant="outline" size="sm" onClick={handleViewLeadInCRM}>
+                       <Button variant="outline" size="sm" className="h-9" onClick={handleViewLeadInCRM}>
                          <CRMIcon /> Ver Lead
                        </Button>
                      </TooltipTrigger>
@@ -1010,8 +1010,8 @@ export function ChatWindow({
                  ) : (
                    <Tooltip>
                      <TooltipTrigger asChild>
-                       <Button variant="outline" size="sm" onClick={() => onToggleLeadPanel(!showLeadPanel)}>
-                         <UserPlus className="w-4 h-4 mr-2" /> Novo Lead
+                       <Button variant="outline" size="sm" className="h-9" onClick={() => onToggleLeadPanel(!showLeadPanel)}>
+                         <Plus className="w-4 h-4 mr-2" /> Novo Lead
                        </Button>
                      </TooltipTrigger>
                      <TooltipContent><p>Criar Lead</p></TooltipContent>
@@ -1021,8 +1021,8 @@ export function ChatWindow({
                    <Tooltip>
                      <TooltipTrigger asChild>
                        <PopoverTrigger asChild>
-                         <Button variant="outline" size="sm">
-                           <User className="w-4 h-4 mr-2" /> Atribuir
+                         <Button variant="outline" size="sm" className="h-9">
+                           <UserPlus className="w-4 h-4 mr-2" /> Atribuir
                          </Button>
                        </PopoverTrigger>
                      </TooltipTrigger>
@@ -1050,8 +1050,7 @@ export function ChatWindow({
                                <span className="flex-1 text-left">{user.nome}</span>
                                <div className="flex items-center gap-1">
                                  {isCurrentUser && (
-                                   <span className="text-xs text-blue-600 font-medium flex items-center gap-1">
-                                     <User className="w-3 h-3" />
+                                   <span className="text-xs text-blue-600 font-medium">
                                      Você
                                    </span>
                                  )}
@@ -1082,14 +1081,15 @@ export function ChatWindow({
                      <Button 
                        variant="outline" 
                        size="sm" 
+                       className="h-9"
                        onClick={() => setShowNotesDialog(true)}
                      >
-                       <NotepadText className="w-4 h-4" />
+                       <StickyNote className="w-4 h-4" />
                      </Button>
                    </TooltipTrigger>
                    <TooltipContent><p>Notas</p></TooltipContent>
                  </Tooltip>
-                 <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="w-4 h-4" /></Button></TooltipTrigger><TooltipContent><p>Atualizar</p></TooltipContent></Tooltip>
+                 <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" className="h-9" onClick={onRefresh}><RefreshCw className="w-4 h-4" /></Button></TooltipTrigger><TooltipContent><p>Atualizar</p></TooltipContent></Tooltip>
              </TooltipProvider>
           </div>
         </div>
@@ -1141,7 +1141,7 @@ export function ChatWindow({
           </div>
 
           {/* INPUT AREA */}
-          <div className="border-t p-4 flex-shrink-0 bg-white">
+          <div className="border-t p-2 flex-shrink-0 bg-white">
             {selectedFile && (
               <div className="mb-2 flex items-center gap-2 p-2 bg-muted rounded-lg">
                 <Paperclip className="w-4 h-4 text-muted-foreground" />
@@ -1149,18 +1149,18 @@ export function ChatWindow({
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={removeSelectedFile}><X className="w-4 h-4" /></Button>
               </div>
             )}
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} />
-              <Button variant="outline" size="icon" className="h-[60px] w-[60px] flex-shrink-0" onClick={() => fileInputRef.current?.click()} disabled={sending}><Paperclip className="w-5 h-5" /></Button>
-              <Button variant="outline" size="icon" className="h-[60px] w-[60px] flex-shrink-0" onClick={() => setQuickRepliesOpen(true)}><Zap className="w-5 h-5" /></Button>
+              <Button variant="outline" size="icon" className="h-10 w-10 flex-shrink-0" onClick={() => fileInputRef.current?.click()} disabled={sending}><Paperclip className="w-5 h-5" /></Button>
+              <Button variant="outline" size="icon" className="h-10 w-10 flex-shrink-0" onClick={() => setQuickRepliesOpen(true)}><Zap className="w-5 h-5" /></Button>
               <Textarea
                 value={newMessage}
                 onChange={(e) => { setNewMessage(e.target.value); registerActivity("typing"); }}
                 onKeyDown={handleKeyPress}
                 placeholder="Digite sua mensagem..."
-                className="resize-none min-h-[60px] max-h-[200px]"
+                className="resize-none min-h-10 max-h-32"
               />
-              <Button onClick={handleSendMessage} disabled={(!newMessage.trim() && !selectedFile) || sending} size="icon" className="h-[60px] w-[60px] flex-shrink-0">
+              <Button onClick={handleSendMessage} disabled={(!newMessage.trim() && !selectedFile) || sending} size="icon" className="h-10 w-10 flex-shrink-0">
                 {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
               </Button>
             </div>

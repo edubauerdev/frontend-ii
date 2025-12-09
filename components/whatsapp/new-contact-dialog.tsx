@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { UserPlus, Loader2 } from "lucide-react"
+import { MessageSquareShare, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 const COUNTRIES = [
@@ -108,9 +108,9 @@ export function NewContactDialog({ onContactCreated }: NewContactDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="w-full gap-2 bg-transparent">
-          <UserPlus className="w-4 h-4" />
-          Chamar Novo Contato
+        <Button variant="outline" className="gap-2 bg-transparent px-3">
+          <MessageSquareShare className="w-4 h-4" />
+          Novo Contato
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">

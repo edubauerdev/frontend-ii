@@ -454,6 +454,12 @@ const Toaster = ({ ...props })=>{
             '--normal-text': 'var(--popover-foreground)',
             '--normal-border': 'var(--border)'
         },
+        toastOptions: {
+            style: {
+                transform: 'scale(0.75)',
+                transformOrigin: 'bottom right'
+            }
+        },
         ...props
     }, void 0, false, {
         fileName: "[project]/components/ui/sonner.tsx",

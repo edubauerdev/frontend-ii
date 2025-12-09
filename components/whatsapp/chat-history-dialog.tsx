@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, UserPlus, ArrowRightLeft, UserMinus, NotepadText, Edit, Tag, Pencil, Plus, ClipboardList, DollarSign, Undo2 } from "lucide-react"
+import { Loader2, UserPlus, ArrowRightLeft, UserMinus, StickyNote, Edit, Tag, Pencil, Plus, ClipboardList, DollarSign, Undo2 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
@@ -87,7 +87,7 @@ export function ChatHistoryDialog({ open, onOpenChange, chatId, chatName }: Chat
       case "lead_unconverted":
         return <Undo2 className="w-4 h-4" />
       default:
-        return <NotepadText className="w-4 h-4" />
+        return <StickyNote className="w-4 h-4" />
     }
   }
 

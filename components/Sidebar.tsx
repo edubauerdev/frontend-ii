@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Settings, ChevronLeft, ChevronRight, ChevronDown, Users } from "lucide-react"
+import { Settings, ChevronLeft, ChevronRight, ChevronDown, Users, Radio } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useUser } from "@/contexts/user-context"
@@ -24,6 +24,7 @@ const FolderClosedIcon = () => (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    className="w-5 h-5"
   >
     <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
   </svg>
@@ -40,6 +41,7 @@ const FolderOpenIcon = () => (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    className="w-5 h-5"
   >
     <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />
   </svg>
@@ -48,14 +50,15 @@ const FolderOpenIcon = () => (
 const BookMarkedIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    width="18"
-    height="18"
+    width="20"
+    height="20"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    className="w-5 h-5"
   >
     <path d="M10 2v8l3-3 3 3V2" />
     <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20" />
@@ -73,10 +76,30 @@ const DatabaseIcon = () => (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    className="w-5 h-5"
   >
     <ellipse cx="12" cy="5" rx="9" ry="3" />
     <path d="M3 5V19A9 3 0 0 0 21 19V5" />
     <path d="M3 12A9 3 0 0 0 21 12" />
+  </svg>
+)
+const UsersIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="w-5 h-5"
+  >
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 )
 
@@ -95,6 +118,11 @@ const WhatsAppIcon = () => (
   >
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
   </svg>
+)
+
+// Ícone Radio Verde Pulsando para Syncing
+const WhatsAppSyncingIcon = () => (
+  <Radio className="w-5 h-5 text-green-500 animate-pulse" />
 )
 
 // Ícone Vermelho/Padrão para Desconectado
@@ -207,6 +235,7 @@ export function Sidebar() {
   
   // ✅ ESTADO LOCAL PARA CONEXÃO (Substituindo o contexto antigo)
   const [isWhatsAppConnected, setIsWhatsAppConnected] = useState(false)
+  const [isWhatsAppSyncing, setIsWhatsAppSyncing] = useState(false)
   const supabase = createClient()
 
   // ✅ EFEITO: Escuta o status do banco em tempo real
@@ -219,8 +248,10 @@ export function Sidebar() {
             .eq("id", 1)
             .single()
         
+        const status = data?.status
+        setIsWhatsAppSyncing(status === "syncing")
         // "syncing" também é considerado conectado
-        setIsWhatsAppConnected(data?.status === "connected" || data?.status === "syncing")
+        setIsWhatsAppConnected(status === "connected" || status === "syncing")
     }
     fetchStatus()
 
@@ -232,6 +263,7 @@ export function Sidebar() {
             { event: "UPDATE", schema: "public", table: "instance_settings", filter: "id=eq.1" },
             (payload) => {
                 const status = payload.new.status
+                setIsWhatsAppSyncing(status === "syncing")
                 // "syncing" também é considerado conectado
                 setIsWhatsAppConnected(status === "connected" || status === "syncing")
             }
@@ -269,18 +301,18 @@ export function Sidebar() {
     <TooltipProvider>
       <aside
         className={cn(
-          "fixed left-0 top-0 h-screen bg-neutral-900 text-neutral-200 p-6 flex flex-col transition-all duration-300 ease-in-out z-40",
-          isCollapsed ? "w-[88px]" : "w-[280px]",
+          "fixed left-0 top-0 h-screen bg-neutral-900 text-neutral-200 p-4 flex flex-col transition-all duration-300 ease-in-out z-40",
+          isCollapsed ? "w-[56px]" : "w-[180px]",
         )}
       >
-        <div className="absolute -right-3 top-6 z-10">
+          <div className="absolute -right-3 top-6 z-10">
           <Button
             size="icon"
             variant="outline"
             className="h-6 w-6 rounded-full bg-black/80 backdrop-blur-sm border-neutral-700 hover:bg-black shadow-lg"
             onClick={toggleCollapse}
           >
-            {isCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+            {isCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
           </Button>
         </div>
 
@@ -326,9 +358,11 @@ export function Sidebar() {
           {menuItems.map((item) => {
             const Icon =
               item.icon === "whatsapp"
-                ? isWhatsAppConnected
-                  ? WhatsAppIcon
-                  : WhatsAppDisconnectedIcon
+                ? isWhatsAppSyncing
+                  ? WhatsAppSyncingIcon
+                  : isWhatsAppConnected
+                    ? WhatsAppIcon
+                    : WhatsAppDisconnectedIcon
                 : item.icon === "googledrive"
                   ? null
                   : item.icon
@@ -405,7 +439,7 @@ export function Sidebar() {
                   {isDocumentosOpen || isDocumentosHovered ? <FolderOpenIcon /> : <FolderClosedIcon />}
                 </span>
                 <span className="flex-1 text-left">Documentos</span>
-                <ChevronDown className={cn("w-4 h-4 transition-transform", isDocumentosOpen && "rotate-180")} />
+                <ChevronDown className={cn("w-5 h-5 transition-transform", isDocumentosOpen && "rotate-180")} />
               </button>
             )}
 
@@ -428,10 +462,10 @@ export function Sidebar() {
                             )}
                           >
                             {SubIcon && (
-                              <span className="w-4 h-4 flex-shrink-0">
-                                <SubIcon />
-                              </span>
-                            )}
+                                <span className="w-5 h-5 flex-shrink-0">
+                                  <SubIcon />
+                                </span>
+                              )}
                           </Link>
                         </TooltipTrigger>
                         <TooltipContent side="right" className="ml-2">
@@ -452,7 +486,7 @@ export function Sidebar() {
                       )}
                     >
                       {SubIcon && (
-                        <span className="w-4 h-4 flex-shrink-0">
+                        <span className="w-5 h-5 flex-shrink-0">
                           <SubIcon />
                         </span>
                       )}

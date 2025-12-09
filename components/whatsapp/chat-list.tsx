@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useRef, useCallback, useMemo, forwardRef, type ElementRef } from "react" 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
-import { Search, AlertCircle, RefreshCw, Loader2, User, Tag, Pencil, UserPlus, X, Tags, Copy, Phone } from "lucide-react"
+import { Search, AlertCircle, RefreshCw, Loader2, User, Tag, Pencil, UserPlus, X, Tags, Copy, Phone, Plus, BarChart3 } from "lucide-react"
 import { cn, getContrastTextColor, formatPhoneNumber } from "@/lib/utils"
 import type { Chat, EtiquetaSimple } from "@/lib/whatsapp-types"
 import { ChatEtiquetasDialog } from "./chat-etiquetas-dialog"
@@ -37,6 +37,7 @@ interface ChatListProps {
   refreshTrigger?: number
   initialData?: any
   onRefresh?: () => void
+  shrink?: boolean // Novo prop para encolher
 }
 
 // URL do Backend para imagens (Proxy)
@@ -49,7 +50,7 @@ const SCROLL_THRESHOLD = 100
 type ChatListHandle = ElementRef<"div">; 
 
 const ChatList = forwardRef<ChatListHandle, ChatListProps>(
-  ({ onSelectChat, selectedChatId, refreshTrigger, initialData, onRefresh }, ref) => { 
+  ({ onSelectChat, selectedChatId, refreshTrigger, initialData, onRefresh, shrink = false }, ref) => { 
     const { data: cachedChats = initialData?.chats || [] } = useSWR(CHAT_LIST_CACHE_KEY)
     const { data: assignmentsMap = initialData?.assignmentsMap || {} } = useSWR<AtribuicoesMap>(ATTR_CACHE_KEY)
     
@@ -97,6 +98,12 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
     // Estado para lista de usuários disponíveis para atribuição (para o submenu)
     const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; nome: string; cargo: string; cor: string }>>([])
     const [assigningUser, setAssigningUser] = useState(false)
+
+    // Estado para controlar se cada chat tem foto de perfil
+    const [hasProfilePictureMap, setHasProfilePictureMap] = useState<{ [chatId: string]: boolean }>({})
+
+    // Estado para mapear quais chats têm leads (por chat_uuid)
+    const [chatLeadsMap, setChatLeadsMap] = useState<{ [chatUuid: string]: { id: string; nome: string } }>({})
 
     const scrollContainerRef = (ref as React.RefObject<HTMLDivElement>) || useRef<HTMLDivElement>(null); 
     const isLoadingRef = useRef(false)
@@ -660,7 +667,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
       }
 
     return (
-      <div className="flex flex-col h-full bg-background border-r"> 
+      <div className={cn("flex flex-col h-full bg-background border-r transition-all duration-300", shrink ? "w-[220px] min-w-[180px] max-w-[240px]" : "w-[380px] min-w-[320px] max-w-[400px]")}> 
         {/* HEADER */}
         <div className="flex flex-col border-b bg-background z-10 sticky top-0">
           <div className="p-3 pb-2">
@@ -733,67 +740,110 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                         <button
                           onClick={() => onSelectChat(chat)} 
                           className={cn(
-                            "w-full flex items-center gap-2.5 px-3 py-2 transition-colors text-left hover:bg-accent/50",
-                            selectedChatId === chat.id && "bg-accent/80 dark:bg-accent",
-                            chat.unreadCount > 0 && "border-l-2 border-primary bg-primary/5"
+                            "w-full flex items-center gap-3 px-3 py-3 transition-all duration-200 text-left",
+                            selectedChatId === chat.id 
+                              ? "bg-primary/15 border-l-4 border-primary hover:bg-primary/20 animate-border-slide" 
+                              : "hover:bg-primary/10",
+                            chat.unreadCount > 0 && selectedChatId !== chat.id && "border-l-2 border-primary bg-primary/5"
                           )}
                         >
                           <Avatar 
-                            className="w-10 h-10 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                            className={cn(
+                              "w-12 h-12 flex-shrink-0 transition-opacity",
+                              hasProfilePictureMap[chat.id] && "cursor-pointer hover:opacity-80"
+                            )}
                             onClick={(e) => {
-                              e.stopPropagation()
+                              if (!hasProfilePictureMap[chat.id]) return;
+                              e.stopPropagation();
                               setProfilePictureChat({
                                 url: profilePicture,
                                 name: chat.name || chat.phone || chat.id.split('@')[0]
-                              })
-                              setShowProfilePictureModal(true)
+                              });
+                              setShowProfilePictureModal(true);
                             }}
                           >
                             <AvatarImage 
-                                src={profilePicture} 
-                                alt={chat.name} 
-                                className="object-cover" 
+                              src={profilePicture} 
+                              alt={chat.name} 
+                              className="object-cover" 
+                              onLoad={() => setHasProfilePictureMap(prev => ({ ...prev, [chat.id]: true }))}
+                              onError={() => setHasProfilePictureMap(prev => ({ ...prev, [chat.id]: false }))}
                             />
                             {/* ✅ CORRIGIDO: Fallback com fundo cinza e ícone de User */}
                             <AvatarFallback className="bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                              <User className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                              <User className="w-6 h-6 text-gray-500 dark:text-gray-400" />
                             </AvatarFallback>
                           </Avatar>
 
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2 mb-0.5">
-                              <p className="font-medium truncate text-sm">{chat.name || chat.phone || chat.id.split('@')[0]}</p>
-                              <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                                {formatTime(chat.lastMessageTime)}
-                              </span>
-                            </div>
-
-                            {/* Mensagem mais recente - sempre exibida */}
-                            <div className="flex items-center justify-between gap-1.5">
-                              <p className="text-xs text-muted-foreground truncate flex-1 min-w-0">
-                                {chat.lastMessage || "Sem mensagens"}
-                              </p>
-                              {chat.unreadCount > 0 && (
-                                <span className="flex-shrink-0 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                                  {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Badges em linha separada (atribuição, etiquetas, notas) */}
-                            {(assignment || hasEtiquetas || hasNote) && (
-                              <div className="flex items-center gap-1 mt-1 flex-wrap">
-                                {/* Badge de atribuição com context menu */}
+                            {/* Linha 1: Nome + Hora + Badges */}
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <p className="font-semibold truncate flex-1 min-w-0">{chat.name || chat.phone || chat.id.split('@')[0]}</p>
+                              {/* Badges alinhados à direita */}
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                {/* Badge de nota */}
+                                {hasNote && (
+                                  <NoteBadge
+                                    chatId={chat.id}
+                                    chatName={chat.name}
+                                    hasNote={hasNote}
+                                    noteContent={noteContent}
+                                    size="md"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onSelectChat={() => onSelectChat(chat)}
+                                  />
+                                )}
+                                {/* Badge de etiquetas compacto */}
+                                {hasEtiquetas && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Badge 
+                                          variant="secondary" 
+                                          className="text-xs px-2 h-6 flex items-center gap-1 flex-shrink-0 cursor-pointer rounded-md bg-neutral-600 text-white border-neutral-600"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setContextMenuChat(chat)
+                                            setShowEtiquetasDialog(true)
+                                          }}
+                                        >
+                                          <Tag className="w-3.5 h-3.5" />
+                                          {chat.etiquetas!.length > 1 && <span>{chat.etiquetas!.length}</span>}
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-[200px] p-1.5">
+                                        <div className="flex flex-wrap gap-1 items-center">
+                                          {chat.etiquetas!.map(etiqueta => (
+                                            <Badge
+                                              key={etiqueta.id}
+                                              variant="secondary"
+                                              className="text-xs px-2 py-0.5 flex items-center gap-1 rounded-md"
+                                              style={{ 
+                                                backgroundColor: etiqueta.cor, 
+                                                borderColor: etiqueta.cor, 
+                                                color: getContrastTextColor(etiqueta.cor) 
+                                              }}
+                                            >
+                                              <Tag className="w-3.5 h-3.5" />
+                                              {etiqueta.nome}
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                                {/* Badge de atribuição */}
                                 {assignment && (
                                   <ContextMenu>
                                     <ContextMenuTrigger asChild>
-                                      <div onClick={(e) => { e.stopPropagation(); onSelectChat(chat); }}>
+                                      <div onClick={(e) => { e.stopPropagation(); onSelectChat(chat); }} className="flex-shrink-0">
                                         <TooltipProvider>
                                           <Tooltip>
                                             <TooltipTrigger asChild>
-                                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 flex items-center gap-1 border flex-shrink-0 cursor-pointer rounded-sm" style={{ backgroundColor: assignment.assigned_to_color || "#6366f1", color: "#ffffff", borderColor: assignment.assigned_to_color || "#6366f1" }}>
-                                                <User className="w-2.5 h-2.5" />
-                                                <span className="max-w-[80px] truncate">{assignment.assigned_to_name?.split(' ')[0]}</span>
+                                              <Badge variant="secondary" className="text-xs px-2 h-6 flex items-center gap-1 flex-shrink-0 cursor-pointer rounded-md" style={{ backgroundColor: assignment.assigned_to_color || "oklch(0.28 0.08 255)", color: "#ffffff", borderColor: assignment.assigned_to_color || "oklch(0.28 0.08 255)" }}>
+                                                <User className="w-3.5 h-3.5" />
+                                                <span className="max-w-[50px] truncate">{assignment.assigned_to_name?.split(' ')[0]}</span>
                                               </Badge>
                                             </TooltipTrigger>
                                             <TooltipContent>
@@ -808,17 +858,14 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                                         onClick={async (e) => {
                                           e.stopPropagation()
                                           try {
-                                            // Buscar a atribuição ativa para obter o ID
                                             const res = await fetch(`/api/whatsapp/assignment?chatId=${chat.id}`)
                                             const data = await res.json()
-                                            
                                             if (data.assignment?.id) {
                                               const deleteRes = await fetch("/api/whatsapp/assignment", {
                                                 method: "DELETE",
                                                 headers: { "Content-Type": "application/json" },
                                                 body: JSON.stringify({ assignmentId: data.assignment.id, chatId: chat.id })
                                               })
-                                              
                                               if (deleteRes.ok) {
                                                 toast.success("Atribuição removida")
                                                 onRefresh?.()
@@ -836,149 +883,23 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                                     </ContextMenuContent>
                                   </ContextMenu>
                                 )}
-                                
-                                {/* Etiquetas - Exibe baseado na configuração show_all_tags */}
-                                {hasEtiquetas && (
-                                  <>
-                                    {user?.show_all_tags ? (
-                                      // Exibe etiquetas coloridas
-                                      <>
-                                        {chat.etiquetas!.slice(0, 3).map((etiqueta) => (
-                                          <ContextMenu key={etiqueta.id}>
-                                            <ContextMenuTrigger asChild>
-                                              <div onClick={(e) => { e.stopPropagation(); onSelectChat(chat); }}>
-                                                <TooltipProvider>
-                                                  <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                      <Badge
-                                                        variant="secondary"
-                                                        className="text-[10px] px-1.5 py-0 h-5 flex items-center gap-1 border cursor-pointer rounded-sm"
-                                                        style={{ backgroundColor: etiqueta.cor, borderColor: etiqueta.cor, color: getContrastTextColor(etiqueta.cor) }}
-                                                      >
-                                                        <Tag className="w-2.5 h-2.5" />
-                                                        <span className="max-w-[60px] truncate">{etiqueta.nome}</span>
-                                                      </Badge>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                      <p>{etiqueta.nome}</p>
-                                                    </TooltipContent>
-                                                  </Tooltip>
-                                                </TooltipProvider>
-                                              </div>
-                                            </ContextMenuTrigger>
-                                            <ContextMenuContent className="w-48">
-                                              <ContextMenuItem
-                                                onClick={async (e) => {
-                                                  e.stopPropagation()
-                                                  try {
-                                                    const res = await fetch("/api/whatsapp/assign-tag", {
-                                                      method: "DELETE",
-                                                      headers: { "Content-Type": "application/json" },
-                                                      body: JSON.stringify({ chatId: chat.id, etiquetaId: etiqueta.id })
-                                                    })
-                                                    if (res.ok) {
-                                                      toast.success("Etiqueta removida")
-                                                      setChats(prev => prev.map(c => 
-                                                        c.id === chat.id 
-                                                          ? { ...c, etiquetas: c.etiquetas?.filter(e => e.id !== etiqueta.id) || [] }
-                                                          : c
-                                                      ))
-                                                      onRefresh?.()
-                                                    }
-                                                  } catch {
-                                                    toast.error("Erro ao remover etiqueta")
-                                                  }
-                                                }}
-                                                className="text-destructive focus:text-destructive"
-                                              >
-                                                <X className="w-4 h-4 mr-2" />
-                                                Remover essa etiqueta
-                                              </ContextMenuItem>
-                                              <ContextMenuSeparator />
-                                              <ContextMenuItem
-                                                onClick={(e) => {
-                                                  e.stopPropagation()
-                                                  setContextMenuChat(chat)
-                                                  setShowEtiquetasDialog(true)
-                                                }}
-                                              >
-                                                <Tags className="w-4 h-4 mr-2" />
-                                                Ver todas etiquetas
-                                              </ContextMenuItem>
-                                            </ContextMenuContent>
-                                          </ContextMenu>
-                                        ))}
-                                        {chat.etiquetas!.length > 3 && (
-                                          <Badge 
-                                            variant="secondary" 
-                                            className="text-[10px] px-1 py-0 h-5 cursor-pointer hover:bg-secondary/80"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              setContextMenuChat(chat)
-                                              setShowEtiquetasDialog(true)
-                                            }}
-                                          >
-                                            +{chat.etiquetas!.length - 3}
-                                          </Badge>
-                                        )}
-                                      </>
-                                    ) : (
-                                      // Exibe badge compacto cinza
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Badge 
-                                              variant="secondary" 
-                                              className="text-[10px] px-1.5 py-0 h-5 flex items-center gap-1 cursor-pointer text-white bg-gray-800 hover:bg-gray-700 rounded-sm"
-                                              onClick={(e) => {
-                                                e.stopPropagation()
-                                                setContextMenuChat(chat)
-                                                setShowEtiquetasDialog(true)
-                                              }}
-                                            >
-                                              <Tag className="w-2.5 h-2.5 text-white" />
-                                              <span>{chat.etiquetas!.length}</span>
-                                            </Badge>
-                                          </TooltipTrigger>
-                                          <TooltipContent side="top" className="max-w-[200px] p-1.5">
-                                            <div className="flex flex-wrap gap-1 items-center">
-                                              {chat.etiquetas!.map(etiqueta => (
-                                                <Badge
-                                                  key={etiqueta.id}
-                                                  variant="secondary"
-                                                  className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 border rounded-sm"
-                                                  style={{ 
-                                                    backgroundColor: etiqueta.cor, 
-                                                    borderColor: etiqueta.cor, 
-                                                    color: getContrastTextColor(etiqueta.cor) 
-                                                  }}
-                                                >
-                                                  <Tag className="w-2.5 h-2.5" />
-                                                  {etiqueta.nome}
-                                                </Badge>
-                                              ))}
-                                            </div>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    )}
-                                  </>
-                                )}
-                                
-                                {/* Badge de Nota */}
-                                {hasNote && (
-                                  <NoteBadge
-                                    chatId={chat.id}
-                                    chatName={chat.name}
-                                    hasNote={hasNote}
-                                    noteContent={noteContent}
-                                    size="sm"
-                                    onClick={(e) => e.stopPropagation()}
-                                    onSelectChat={() => onSelectChat(chat)}
-                                  />
-                                )}
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  {formatTime(chat.lastMessageTime)}
+                                </span>
                               </div>
-                            )}
+                            </div>
+
+                            {/* Linha 2: Mensagem mais recente + badge de mensagens novas */}
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm text-muted-foreground truncate flex-1">
+                                {chat.lastMessage || "Sem mensagens"}
+                              </p>
+                              {chat.unreadCount > 0 && (
+                                <span className="flex-shrink-0 bg-primary text-primary-foreground text-xs font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
+                                  {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </button>
                       </ContextMenuTrigger>
@@ -1016,7 +937,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                                     return (
                                       <ContextMenuItem
                                         key={assignUser.id}
-                                        onClick={() => handleAssignUser(chat.id, chat.name || chat.pushName || chat.id, assignUser.id, assignUser.nome)}
+                                        onClick={() => handleAssignUser(chat.id, chat.name || chat.phone || chat.id, assignUser.id, assignUser.nome)}
                                         disabled={assigningUser}
                                         className="cursor-pointer"
                                       >

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
-import { NotepadText, Loader2 } from "lucide-react"
+import { StickyNote, Loader2 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Dialog,
@@ -100,8 +100,8 @@ export function NoteBadge({
     : "Nota disponível"
 
   const sizeClasses = size === "sm" 
-    ? "text-[10px] px-1.5 py-0 h-5" 
-    : "text-xs px-2 py-0.5"
+    ? "text-[9px] px-1.5 py-0 h-5" 
+    : "text-xs px-2 h-6"
 
   return (
     <>
@@ -110,11 +110,11 @@ export function NoteBadge({
           <TooltipTrigger asChild>
             <Badge
               variant="secondary"
-              className={`${sizeClasses} flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white border-amber-500 cursor-pointer rounded-sm`}
+              className={`${sizeClasses} flex items-center gap-1 cursor-pointer rounded-md bg-amber-500 text-white border-amber-500 flex-shrink-0`}
               onClick={handleClick}
             >
-              <NotepadText className={size === "sm" ? "w-2.5 h-2.5" : "w-3 h-3"} />
-              {size === "md" && "Nota"}
+              <StickyNote className={`${size === "sm" ? "w-3 h-3" : "w-3.5 h-3.5"}`} />
+              <span>1</span>
             </Badge>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs">
@@ -129,7 +129,7 @@ export function NoteBadge({
         <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <NotepadText className="w-5 h-5 text-amber-500" />
+              <StickyNote className="w-5 h-5 text-amber-600" />
               Histórico de Notas
             </DialogTitle>
             <DialogDescription>{chatName}</DialogDescription>
@@ -154,14 +154,14 @@ export function NoteBadge({
                     <div key={entry.id} className="relative flex gap-4 group">
                       {/* Timeline dot */}
                       <div className="relative z-10 flex items-center justify-center w-10 h-10 rounded-full bg-amber-500 text-white">
-                        <NotepadText className="w-4 h-4" />
+                        <StickyNote className="w-4 h-4" />
                       </div>
 
                       {/* Content */}
                       <div className="flex-1 pb-2">
                         <div className="bg-card border rounded-lg p-3 shadow-sm group-hover:shadow-md transition-shadow">
                           <div className="flex items-start justify-between gap-2 mb-1">
-                            <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-700 border-amber-200 rounded-sm">
+                            <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-700 border-amber-200 rounded-md">
                               {entry.event_type === "note_created" ? "Criada" : "Atualizada"}
                             </Badge>
                             <span className="text-[10px] text-muted-foreground whitespace-nowrap">
