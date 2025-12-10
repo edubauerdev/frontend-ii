@@ -1075,7 +1075,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                                             toast.error("Erro ao remover atribuição")
                                           }
                                         }}
-                                        className="text-destructive focus:text-destructive"
+                                        className="cursor-pointer text-destructive focus:text-destructive"
                                       >
                                         <X className="w-4 h-4 mr-2" />
                                         Remover atribuição
@@ -1106,12 +1106,12 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                       <ContextMenuContent className="w-48">
                         {/* Atribuir com submenu de usuários */}
                         <ContextMenuSub>
-                          <ContextMenuSubTrigger>
+                          <ContextMenuSubTrigger className="cursor-pointer">
                             <UserPlus className="w-4 h-4 mr-2" />
                             Atribuir
                           </ContextMenuSubTrigger>
                           <ContextMenuPortal>
-                            <ContextMenuSubContent className="w-48">
+                            <ContextMenuSubContent className="min-w-48 w-fit">
                               {availableUsers.length === 0 ? (
                                 <div className="p-2 text-sm text-muted-foreground text-center">
                                   Nenhum usuário disponível
@@ -1169,12 +1169,12 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                         
                         {/* Etiqueta com submenu */}
                         <ContextMenuSub>
-                          <ContextMenuSubTrigger>
+                          <ContextMenuSubTrigger className="cursor-pointer">
                             <Tag className="w-4 h-4 mr-2" />
                             Etiqueta
                           </ContextMenuSubTrigger>
                           <ContextMenuPortal>
-                            <ContextMenuSubContent className="w-48">
+                            <ContextMenuSubContent className="min-w-48 w-fit">
                               {availableEtiquetas.length === 0 ? (
                                 <div className="p-2 text-sm text-muted-foreground text-center">
                                   Nenhuma etiqueta disponível
@@ -1213,6 +1213,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                             setContextMenuChat(chat)
                             setShowEditNameDialog(true)
                           }}
+                          className="cursor-pointer"
                         >
                           <Pencil className="w-4 h-4 mr-2" />
                           Editar nome
@@ -1224,6 +1225,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                             setContextMenuChat(chat)
                             setShowHistoryDialog(true)
                           }}
+                          className="cursor-pointer"
                         >
                           <History className="w-4 h-4 mr-2" />
                           Ver histórico
@@ -1238,6 +1240,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                               const leadDate = chatLead.proximo_contato || new Date().toISOString().split('T')[0]
                               router.push(`/crm?leadId=${chatLead.id}&date=${leadDate}`)
                             }}
+                            className="cursor-pointer"
                           >
                             <CRMIcon className="w-4 h-4 mr-2" />
                             Ver Lead
@@ -1253,6 +1256,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                                 }, 150)
                               }
                             }}
+                            className="cursor-pointer"
                           >
                             <Plus className="w-4 h-4 mr-2" />
                             Novo Lead

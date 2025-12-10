@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, UserPlus, ArrowRightLeft, UserMinus, StickyNote, Edit, Tag, Pencil, Plus, ClipboardList, DollarSign, Undo2 } from "lucide-react"
+import { Loader2, UserPlus, ArrowRightLeft, UserMinus, StickyNote, Edit, Tag, Pencil, Plus, ClipboardList, DollarSign, Undo2, User } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
@@ -145,18 +144,20 @@ export function ChatHistoryDialog({ open, onOpenChange, chatId, chatName }: Chat
 
   // Badge de usuário no estilo do badge de atribuição
   function UserBadge({ name, color }: { name: string; color?: string }) {
-    const bgColor = color || "#3b82f6" // azul padrão
+    const displayName = name || "Usuário"
+    const bgColor = color || "#6b7280" // cinza padrão
     return (
       <Badge
         variant="secondary"
-        className="text-[10px] px-1.5 py-0.5 h-auto font-medium border whitespace-nowrap"
+        className="text-xs h-6 px-1.5 flex items-center gap-1 cursor-pointer rounded-md border"
         style={{
-          backgroundColor: bgColor,
-          color: getContrastTextColor(bgColor),
+          backgroundColor: `color-mix(in srgb, ${bgColor} 20%, white)`,
           borderColor: bgColor,
+          color: bgColor
         }}
       >
-        {name}
+        <User className="w-3.5 h-3.5" />
+        <span className="text-xs max-w-[60px] truncate">{displayName.split(' ')[0]}</span>
       </Badge>
     )
   }
@@ -310,7 +311,7 @@ export function ChatHistoryDialog({ open, onOpenChange, chatId, chatName }: Chat
           <DialogDescription>{chatName}</DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 max-h-[calc(80vh-100px)] pr-4">
+        <div className="flex-1 min-h-0 max-h-[calc(80vh-100px)] overflow-y-auto pr-4">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -369,7 +370,7 @@ export function ChatHistoryDialog({ open, onOpenChange, chatId, chatName }: Chat
               </div>
             </div>
           )}
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   )

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, UserPlus, ArrowRightLeft, UserMinus, CheckCircle } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
@@ -123,7 +122,7 @@ export function AssignmentHistoryDialog({ open, onOpenChange, chatId, chatName }
           <DialogDescription>{chatName}</DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[500px] pr-4">
+        <div className="max-h-[500px] overflow-y-auto pr-4">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -188,7 +187,7 @@ export function AssignmentHistoryDialog({ open, onOpenChange, chatId, chatName }
               </div>
             </div>
           )}
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   )

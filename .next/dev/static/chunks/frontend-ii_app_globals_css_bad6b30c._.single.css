@@ -1592,6 +1592,10 @@
     max-width: 50px;
   }
 
+  .max-w-\[60px\] {
+    max-width: 60px;
+  }
+
   .max-w-\[70\%\] {
     max-width: 70%;
   }
@@ -1658,6 +1662,10 @@
 
   .min-w-10 {
     min-width: calc(var(--spacing) * 10);
+  }
+
+  .min-w-48 {
+    min-width: calc(var(--spacing) * 48);
   }
 
   .min-w-\[8rem\] {
@@ -7447,7 +7455,7 @@
   cursor: url("/cursor.svg") 2 2, auto;
 }
 
-a, a *, a svg, button, button *, button svg, input[type="button"], input[type="submit"], input[type="reset"], input[type="checkbox"], input[type="radio"], select, summary, label, [role="button"], [role="button"] *, [role="button"] svg, [role="menuitem"], [role="option"], [role="tab"], [role="checkbox"], [role="switch"], [role="link"], [tabindex]:not([tabindex="-1"]), [data-radix-collection-item], .cursor-pointer, .clickable, .lead-card, .lead-card *, nav a, nav a *, nav a svg, nav button, nav button *, nav button svg, aside a, aside a *, aside a svg, aside button, aside button *, aside button svg {
+a, a *, a svg, a span, button, button *, button svg, button span, button p, button div, input[type="button"], input[type="submit"], input[type="reset"], input[type="checkbox"], input[type="radio"], select, select *, summary, summary *, label, label *, [role="button"], [role="button"] *, [role="button"] svg, [role="button"] span, [role="menuitem"], [role="menuitem"] *, [role="menuitem"] svg, [role="menuitem"] span, [role="menuitem"] p, [role="menuitemcheckbox"], [role="menuitemcheckbox"] *, [role="menuitemradio"], [role="menuitemradio"] *, [role="option"], [role="option"] *, [role="tab"], [role="tab"] *, [role="checkbox"], [role="checkbox"] *, [role="switch"], [role="switch"] *, [role="link"], [role="link"] *, [role="combobox"], [role="combobox"] *, [role="listbox"], [role="listbox"] *, [tabindex]:not([tabindex="-1"]), [tabindex]:not([tabindex="-1"]) *, [data-radix-collection-item], [data-radix-collection-item] *, [data-state="open"], [data-state="open"] *, [data-state="checked"], [data-state="checked"] *, .cursor-pointer, .cursor-pointer *, .clickable, .clickable *, .lead-card, .lead-card *, nav a, nav a *, nav a svg, nav button, nav button *, nav button svg, aside a, aside a *, aside a svg, aside button, aside button *, aside button svg {
   cursor: url("/mao-pointer.svg") 6 0, pointer !important;
 }
 

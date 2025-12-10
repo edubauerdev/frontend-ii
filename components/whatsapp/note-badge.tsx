@@ -11,7 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
@@ -135,7 +134,7 @@ export function NoteBadge({
             <DialogDescription>{chatName}</DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[500px] pr-4">
+          <div className="max-h-[500px] overflow-y-auto pr-4">
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -216,7 +215,7 @@ export function NoteBadge({
                 </div>
               </div>
             )}
-          </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
     </>

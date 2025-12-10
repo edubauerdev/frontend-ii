@@ -287,7 +287,7 @@ export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, o
                           e.stopPropagation()
                           onRemoveAssignment?.()
                         }}
-                        className="text-destructive focus:text-destructive"
+                        className="cursor-pointer text-destructive focus:text-destructive"
                       >
                         <X className="w-4 h-4 mr-2" />
                         Remover atribuição
@@ -514,7 +514,7 @@ export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, o
         {/* Atribuir com submenu */}
         {availableUsers && availableUsers.length > 0 && (
           <ContextMenuSub>
-            <ContextMenuSubTrigger disabled={!lead.chat_uuid}>
+            <ContextMenuSubTrigger disabled={!lead.chat_uuid} className="cursor-pointer">
               <UserPlus className="w-4 h-4 mr-2" />
               Atribuir
             </ContextMenuSubTrigger>
@@ -577,7 +577,7 @@ export function LeadCard({ lead, onClick, onView, onMove, onDelete, onConvert, o
         {/* Etiqueta com submenu */}
         {availableEtiquetas && availableEtiquetas.length > 0 && (
           <ContextMenuSub>
-            <ContextMenuSubTrigger disabled={!lead.chat_uuid}>
+            <ContextMenuSubTrigger disabled={!lead.chat_uuid} className="cursor-pointer">
               <Tag className="w-4 h-4 mr-2" />
               Etiqueta
             </ContextMenuSubTrigger>

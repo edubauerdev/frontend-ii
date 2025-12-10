@@ -902,7 +902,7 @@ export function ChatWindow({
                             toast.error("Erro ao remover atribuição")
                           }
                         }}
-                        className="text-destructive focus:text-destructive"
+                        className="cursor-pointer text-destructive focus:text-destructive"
                       >
                         <X className="w-4 h-4 mr-2" />
                         Remover atribuição
@@ -1001,13 +1001,13 @@ export function ChatWindow({
                                   toast.error("Erro ao remover etiqueta")
                                 }
                               }}
-                              className="text-destructive focus:text-destructive"
+                              className="cursor-pointer text-destructive focus:text-destructive"
                             >
                               <X className="w-4 h-4 mr-2" />
                               Remover essa etiqueta
                             </ContextMenuItem>
                             <ContextMenuSeparator />
-                            <ContextMenuItem onClick={() => setShowEtiquetasDialog(true)}>
+                            <ContextMenuItem onClick={() => setShowEtiquetasDialog(true)} className="cursor-pointer">
                               <Tags className="w-4 h-4 mr-2" />
                               Ver todas etiquetas
                             </ContextMenuItem>
