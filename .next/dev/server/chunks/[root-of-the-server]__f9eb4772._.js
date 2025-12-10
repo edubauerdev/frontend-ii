@@ -83,7 +83,9 @@ __turbopack_context__.s([
     "DELETE",
     ()=>DELETE,
     "GET",
-    ()=>GET
+    ()=>GET,
+    "POST",
+    ()=>POST
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/frontend-ii/node_modules/next/server.js [app-route] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$lib$2f$supabase$2f$server$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/frontend-ii/lib/supabase/server.ts [app-route] (ecmascript)");
@@ -91,6 +93,129 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$node_modul
 ;
 ;
 ;
+async function POST(request) {
+    try {
+        const supabase = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$lib$2f$supabase$2f$server$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["createServerClient"])();
+        const cookieStore = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$node_modules$2f$next$2f$headers$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["cookies"])();
+        const body = await request.json();
+        const { chatId, chatName, assignToId, assignToName, assignedById, assignedByName } = body;
+        if (!chatId || !assignToId || !assignToName) {
+            return __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                success: false,
+                message: "chatId, assignToId e assignToName são obrigatórios"
+            }, {
+                status: 400
+            });
+        }
+        // Verifica se já existe uma atribuição ativa para este chat
+        const { data: existingAssignment } = await supabase.from("chat_assignments").select("*").eq("chat_id", chatId).eq("status", "active").maybeSingle();
+        // Se já existe, verifica se é o mesmo usuário
+        if (existingAssignment) {
+            // Se já está atribuído ao mesmo usuário, retorna sem fazer nada (não salva no histórico)
+            if (existingAssignment.assigned_to_id === assignToId) {
+                return __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                    success: false,
+                    message: `Este chat já está atribuído a ${assignToName}`,
+                    alreadyAssigned: true
+                });
+            }
+            // Se é um usuário diferente, atualiza
+            const { error: updateError } = await supabase.from("chat_assignments").update({
+                assigned_to_id: assignToId,
+                assigned_to_name: assignToName,
+                updated_at: new Date().toISOString()
+            }).eq("id", existingAssignment.id);
+            if (updateError) {
+                console.error("[API] Erro ao atualizar atribuição:", updateError);
+                return __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                    success: false,
+                    message: "Erro ao atualizar atribuição"
+                }, {
+                    status: 500
+                });
+            }
+            // Registra no histórico
+            try {
+                const { error: historyError } = await supabase.from("chat_history").insert({
+                    chat_id: chatId,
+                    chat_name: chatName || chatId,
+                    event_type: "assignment_transferred",
+                    event_data: {
+                        from_user_id: existingAssignment.assigned_to_id,
+                        from_user_name: existingAssignment.assigned_to_name,
+                        to_user_id: assignToId,
+                        to_user_name: assignToName
+                    },
+                    performed_by_id: assignedById,
+                    performed_by_name: assignedByName || "Sistema"
+                });
+                if (historyError) {
+                    console.error("[API] Erro ao registrar histórico (assignment_transferred):", historyError);
+                } else {
+                    console.log("[API] Histórico registrado com sucesso (assignment_transferred)");
+                }
+            } catch (logError) {
+                console.error("[API] Erro ao registrar histórico:", logError);
+            }
+            return __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                success: true,
+                message: "Atribuição atualizada com sucesso"
+            });
+        }
+        // Se não existe, cria nova
+        const { error: insertError } = await supabase.from("chat_assignments").insert({
+            chat_id: chatId,
+            chat_name: chatName || chatId,
+            assigned_to_id: assignToId,
+            assigned_to_name: assignToName,
+            assigned_by_id: assignedById,
+            assigned_by_name: assignedByName || "Sistema",
+            status: "active"
+        });
+        if (insertError) {
+            console.error("[API] Erro ao criar atribuição:", insertError);
+            return __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                success: false,
+                message: "Erro ao criar atribuição"
+            }, {
+                status: 500
+            });
+        }
+        // Registra no histórico
+        try {
+            const { error: historyError } = await supabase.from("chat_history").insert({
+                chat_id: chatId,
+                chat_name: chatName || chatId,
+                event_type: "assignment_created",
+                event_data: {
+                    user_id: assignToId,
+                    user_name: assignToName
+                },
+                performed_by_id: assignedById,
+                performed_by_name: assignedByName || "Sistema"
+            });
+            if (historyError) {
+                console.error("[API] Erro ao registrar histórico (assignment_created):", historyError);
+            } else {
+                console.log("[API] Histórico registrado com sucesso (assignment_created)");
+            }
+        } catch (logError) {
+            console.error("[API] Erro ao registrar histórico:", logError);
+        }
+        return __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            success: true,
+            message: "Atribuição criada com sucesso"
+        });
+    } catch (error) {
+        console.error("[API] Erro ao processar atribuição:", error);
+        return __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            success: false,
+            message: "Erro interno do servidor"
+        }, {
+            status: 500
+        });
+    }
+}
 async function GET(request) {
     try {
         const supabase = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$frontend$2d$ii$2f$lib$2f$supabase$2f$server$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["createServerClient"])();

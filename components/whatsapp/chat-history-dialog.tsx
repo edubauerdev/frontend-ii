@@ -143,48 +143,66 @@ export function ChatHistoryDialog({ open, onOpenChange, chatId, chatName }: Chat
     }
   }
 
+  // Badge de usuário no estilo do badge de atribuição
+  function UserBadge({ name, color }: { name: string; color?: string }) {
+    const bgColor = color || "#3b82f6" // azul padrão
+    return (
+      <Badge
+        variant="secondary"
+        className="text-[10px] px-1.5 py-0.5 h-auto font-medium border whitespace-nowrap"
+        style={{
+          backgroundColor: bgColor,
+          color: getContrastTextColor(bgColor),
+          borderColor: bgColor,
+        }}
+      >
+        {name}
+      </Badge>
+    )
+  }
+
   function getEventDescription(entry: ChatHistoryEntry) {
     const { event_type, event_data, performed_by_name } = entry
 
     switch (event_type) {
       case "assignment_created":
         return (
-          <span>
-            <strong>{performed_by_name}</strong> atribuiu o chat para{" "}
-            <strong>{event_data.assigned_to_name}</strong>
+          <span className="flex flex-wrap items-center gap-1">
+            <UserBadge name={performed_by_name} color={event_data.performed_by_cor} /> atribuiu o chat para{" "}
+            <UserBadge name={event_data.assigned_to_name} color={event_data.assigned_to_cor} />
           </span>
         )
       case "assignment_transferred":
         return (
-          <span>
-            <strong>{performed_by_name}</strong> transferiu de{" "}
-            <strong>{event_data.from_user_name}</strong> para{" "}
-            <strong>{event_data.to_user_name}</strong>
+          <span className="flex flex-wrap items-center gap-1">
+            <UserBadge name={performed_by_name} color={event_data.performed_by_cor} /> transferiu de{" "}
+            <UserBadge name={event_data.from_user_name} color={event_data.from_user_cor} /> para{" "}
+            <UserBadge name={event_data.to_user_name} color={event_data.to_user_cor} />
           </span>
         )
       case "assignment_removed":
         return (
-          <span>
-            <strong>{performed_by_name}</strong> removeu a atribuição de{" "}
-            <strong>{event_data.removed_user_name}</strong>
+          <span className="flex flex-wrap items-center gap-1">
+            <UserBadge name={performed_by_name} color={event_data.performed_by_cor} /> removeu a atribuição de{" "}
+            <UserBadge name={event_data.removed_user_name} color={event_data.removed_user_cor} />
           </span>
         )
       case "note_created":
         return (
-          <span>
-            <strong>{performed_by_name}</strong> criou uma nota
+          <span className="flex flex-wrap items-center gap-1">
+            <UserBadge name={performed_by_name} color={event_data.performed_by_cor} /> criou uma nota
           </span>
         )
       case "note_updated":
         return (
-          <span>
-            <strong>{performed_by_name}</strong> atualizou a nota
+          <span className="flex flex-wrap items-center gap-1">
+            <UserBadge name={performed_by_name} color={event_data.performed_by_cor} /> atualizou a nota
           </span>
         )
       case "etiqueta_added":
         return (
-          <span>
-            <strong>{performed_by_name}</strong> adicionou a etiqueta{" "}
+          <span className="flex flex-wrap items-center gap-1">
+            <UserBadge name={performed_by_name} color={event_data.performed_by_cor} /> adicionou a etiqueta{" "}
             <Badge
               variant="outline"
               className="text-xs ml-1"
@@ -200,8 +218,8 @@ export function ChatHistoryDialog({ open, onOpenChange, chatId, chatName }: Chat
         )
       case "etiqueta_removed":
         return (
-          <span>
-            <strong>{performed_by_name}</strong> removeu a etiqueta{" "}
+          <span className="flex flex-wrap items-center gap-1">
+            <UserBadge name={performed_by_name} color={event_data.performed_by_cor} /> removeu a etiqueta{" "}
             <Badge
               variant="outline"
               className="text-xs ml-1 line-through"
@@ -217,24 +235,24 @@ export function ChatHistoryDialog({ open, onOpenChange, chatId, chatName }: Chat
         )
       case "name_changed":
         return (
-          <span>
-            <strong>{performed_by_name}</strong> alterou o nome de{" "}
+          <span className="flex flex-wrap items-center gap-1">
+            <UserBadge name={performed_by_name} color={event_data.performed_by_cor} /> alterou o nome de{" "}
             <span className="line-through text-muted-foreground">{event_data.previous_name}</span> para{" "}
             <strong>{event_data.new_name}</strong>
           </span>
         )
       case "lead_converted":
         return (
-          <span>
-            <strong>{performed_by_name}</strong> converteu o lead{" "}
+          <span className="flex flex-wrap items-center gap-1">
+            <UserBadge name={performed_by_name} color={event_data.performed_by_cor} /> converteu o lead{" "}
             <strong>{event_data.lead_nome}</strong> com valor de{" "}
             <span className="text-emerald-600 font-semibold">R$ {event_data.valor_formatado || event_data.valor}</span>
           </span>
         )
       case "lead_unconverted":
         return (
-          <span>
-            <strong>{performed_by_name}</strong> desconverteu o lead{" "}
+          <span className="flex flex-wrap items-center gap-1">
+            <UserBadge name={performed_by_name} color={event_data.performed_by_cor} /> desconverteu o lead{" "}
             <strong>{event_data.lead_nome}</strong>
             {event_data.motivo && (
               <span className="text-muted-foreground"> - Motivo: {event_data.motivo}</span>
@@ -242,7 +260,7 @@ export function ChatHistoryDialog({ open, onOpenChange, chatId, chatName }: Chat
           </span>
         )
       default:
-        return <span>Ação realizada por <strong>{performed_by_name}</strong></span>
+        return <span className="flex flex-wrap items-center gap-1">Ação realizada por <UserBadge name={performed_by_name} color={event_data.performed_by_cor} /></span>
     }
   }
 
@@ -284,15 +302,15 @@ export function ChatHistoryDialog({ open, onOpenChange, chatId, chatName }: Chat
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <ClipboardList className="w-5 h-5" /> Histórico Completo
           </DialogTitle>
           <DialogDescription>{chatName}</DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[500px] pr-4">
+        <ScrollArea className="flex-1 min-h-0 max-h-[calc(80vh-100px)] pr-4">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

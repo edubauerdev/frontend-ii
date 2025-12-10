@@ -239,7 +239,6 @@
     --color-blue-900: #1c398e;
     --color-purple-100: #f3e8ff;
     --color-purple-200: #e9d5ff;
-    --color-purple-300: #d9b3ff;
     --color-purple-500: #ac4bff;
     --color-purple-700: #8200da;
     --color-gray-50: #f9fafb;
@@ -378,7 +377,6 @@
       --color-blue-900: lab(26.1542% 15.7545 -51.5504);
       --color-purple-100: lab(93.3333% 6.9744 -9.83434);
       --color-purple-200: lab(87.8405% 13.4282 -18.7159);
-      --color-purple-300: lab(78.3298% 26.2195 -34.9499);
       --color-purple-500: lab(52.0183% 66.11 -78.2316);
       --color-purple-700: lab(36.1758% 69.8525 -80.0381);
       --color-gray-50: lab(98.2596% -.247031 -.706708);
@@ -1450,6 +1448,10 @@
     max-height: 500px;
   }
 
+  .max-h-\[calc\(80vh-100px\)\] {
+    max-height: calc(80vh - 100px);
+  }
+
   .max-h-screen {
     max-height: 100vh;
   }
@@ -2311,11 +2313,6 @@
     border-left-width: 1px;
   }
 
-  .border-l-2 {
-    border-left-style: var(--tw-border-style);
-    border-left-width: 2px;
-  }
-
   .border-l-4 {
     border-left-style: var(--tw-border-style);
     border-left-width: 4px;
@@ -2456,6 +2453,10 @@
     }
   }
 
+  .border-green-600 {
+    border-color: var(--color-green-600);
+  }
+
   .border-input {
     border-color: var(--input);
   }
@@ -2478,10 +2479,6 @@
 
   .border-neutral-500 {
     border-color: var(--color-neutral-500);
-  }
-
-  .border-neutral-600 {
-    border-color: var(--color-neutral-600);
   }
 
   .border-neutral-700 {
@@ -2540,10 +2537,6 @@
 
   .border-purple-200 {
     border-color: var(--color-purple-200);
-  }
-
-  .border-purple-300 {
-    border-color: var(--color-purple-300);
   }
 
   .border-red-100 {
@@ -2844,10 +2837,6 @@
 
   .bg-neutral-200 {
     background-color: var(--color-neutral-200);
-  }
-
-  .bg-neutral-600 {
-    background-color: var(--color-neutral-600);
   }
 
   .bg-neutral-700 {
@@ -4588,6 +4577,12 @@
   @media (hover: hover) {
     .hover\:bg-green-100:hover {
       background-color: var(--color-green-100);
+    }
+  }
+
+  @media (hover: hover) {
+    .hover\:bg-green-200:hover {
+      background-color: var(--color-green-200);
     }
   }
 
@@ -6530,6 +6525,16 @@
     }
   }
 
+  .dark\:bg-green-900\/40:is(.dark *) {
+    background-color: #0d542b66;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .dark\:bg-green-900\/40:is(.dark *) {
+      background-color: color-mix(in oklab, var(--color-green-900) 40%, transparent);
+    }
+  }
+
   .dark\:bg-input\/30:is(.dark *) {
     background-color: var(--input);
   }
@@ -6564,6 +6569,18 @@
     @supports (color: color-mix(in lab, red, red)) {
       .dark\:hover\:bg-accent\/50:is(.dark *):hover {
         background-color: color-mix(in oklab, var(--accent) 50%, transparent);
+      }
+    }
+  }
+
+  @media (hover: hover) {
+    .dark\:hover\:bg-green-900\/60:is(.dark *):hover {
+      background-color: #0d542b99;
+    }
+
+    @supports (color: color-mix(in lab, red, red)) {
+      .dark\:hover\:bg-green-900\/60:is(.dark *):hover {
+        background-color: color-mix(in oklab, var(--color-green-900) 60%, transparent);
       }
     }
   }
@@ -7511,7 +7528,7 @@
 }
 
 *, :before, :after, html, body {
-  cursor: url("/cursor.svg") 2 2, auto !important;
+  cursor: url("/cursor.svg") 2 2, auto;
 }
 
 a, a *, a svg, button, button *, button svg, input[type="button"], input[type="submit"], input[type="reset"], input[type="checkbox"], input[type="radio"], select, summary, label, [role="button"], [role="button"] *, [role="button"] svg, [role="menuitem"], [role="option"], [role="tab"], [role="checkbox"], [role="switch"], [role="link"], [tabindex]:not([tabindex="-1"]), [data-radix-collection-item], .cursor-pointer, .clickable, .lead-card, .lead-card *, nav a, nav a *, nav a svg, nav button, nav button *, nav button svg, aside a, aside a *, aside a svg, aside button, aside button *, aside button svg {
@@ -7625,7 +7642,7 @@ input[type="text"], input[type="email"], input[type="password"], input[type="sea
   cursor: url("/select-text.svg") 8 8, text !important;
 }
 
-input:active, textarea:active, [contenteditable="true"]:active, p::selection, span::selection, div::selection, ::selection {
+input:active, textarea:active, [contenteditable="true"]:active, p::selection, span::selection, div::selection, ::selection, body.selecting-text, body.selecting-text *, body.selecting-text :before, body.selecting-text :after, ::selection, ::selection {
   cursor: url("/select-text.svg") 8 8, text !important;
 }
 

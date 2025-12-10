@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useRef, useCallback, useMemo, forwardRef, type ElementRef } from "react" 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
-import { Search, AlertCircle, RefreshCw, Loader2, User, Tag, Pencil, UserPlus, X, Tags, Copy, Phone, Plus, BarChart3, Check, FileText } from "lucide-react"
+import { Search, AlertCircle, RefreshCw, Loader2, User, Tag, Pencil, UserPlus, X, Tags, Copy, Phone, Plus, BarChart3, Check, FileText, CheckCircle } from "lucide-react"
 import { cn, getContrastTextColor, formatPhoneNumber } from "@/lib/utils"
 import type { Chat, EtiquetaSimple } from "@/lib/whatsapp-types"
 import { ChatEtiquetasDialog } from "./chat-etiquetas-dialog"
@@ -29,6 +29,8 @@ import { TagSelector } from "./tag-selector"
 import { AssignToUserDialog } from "./assign-to-user-dialog"
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription"
 import { ProfilePictureModal } from "./profile-picture-modal"
+import { ChatHistoryDialog } from "./chat-history-dialog"
+import { History } from "lucide-react"
 import type { Etiqueta } from "@/lib/whatsapp-types" 
 
 // Ícone SVG do CRM (mesmo usado na Sidebar)
@@ -133,6 +135,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
     const [contextMenuEtiqueta, setContextMenuEtiqueta] = useState<EtiquetaSimple | null>(null)
     const [showProfilePictureModal, setShowProfilePictureModal] = useState(false)
     const [profilePictureChat, setProfilePictureChat] = useState<{url: string, name: string} | null>(null)
+    const [showHistoryDialog, setShowHistoryDialog] = useState(false)
     
     // Estado para chats com notas (mapa de chatId -> conteúdo da nota)
     const [chatNotes, setChatNotes] = useState<Record<string, string>>({})
@@ -149,7 +152,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
     const [hasProfilePictureMap, setHasProfilePictureMap] = useState<{ [chatId: string]: boolean }>({})
 
     // Estado para mapear quais chats têm leads (por telefone e chat_uuid)
-    const [chatLeadsMap, setChatLeadsMap] = useState<{ [key: string]: { id: string; nome: string; temperatura: string; proximo_contato: string | null } }>({})
+    const [chatLeadsMap, setChatLeadsMap] = useState<{ [key: string]: { id: string; nome: string; temperatura: string; proximo_contato: string | null; status: string | null } }>({})
 
     const scrollContainerRef = (ref as React.RefObject<HTMLDivElement>) || useRef<HTMLDivElement>(null); 
     const isLoadingRef = useRef(false)
@@ -170,7 +173,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
             // Constrói a query de forma segura
             let query = supabase
                 .from('leads')
-                .select('id, nome, telefone, chat_uuid, temperatura, proximo_contato');
+                .select('id, nome, telefone, chat_uuid, temperatura, proximo_contato, status');
             
             // Monta o filtro OR dinamicamente
             const orConditions: string[] = [];
@@ -191,17 +194,17 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
             }
             
             if (leads && leads.length > 0) {
-                const leadsMap: { [key: string]: { id: string; nome: string; temperatura: string; proximo_contato: string | null } } = {};
+                const leadsMap: { [key: string]: { id: string; nome: string; temperatura: string; proximo_contato: string | null; status: string | null } } = {};
                 leads.forEach(lead => {
                     // Mapeia por telefone (limpo)
                     if (lead.telefone) {
                         const cleanPhone = lead.telefone.replace(/\D/g, '');
-                        leadsMap[cleanPhone] = { id: lead.id, nome: lead.nome, temperatura: lead.temperatura || 'Morno', proximo_contato: lead.proximo_contato };
-                        leadsMap[lead.telefone] = { id: lead.id, nome: lead.nome, temperatura: lead.temperatura || 'Morno', proximo_contato: lead.proximo_contato };
+                        leadsMap[cleanPhone] = { id: lead.id, nome: lead.nome, temperatura: lead.temperatura || 'Morno', proximo_contato: lead.proximo_contato, status: lead.status };
+                        leadsMap[lead.telefone] = { id: lead.id, nome: lead.nome, temperatura: lead.temperatura || 'Morno', proximo_contato: lead.proximo_contato, status: lead.status };
                     }
                     // Mapeia por chat_uuid
                     if (lead.chat_uuid) {
-                        leadsMap[lead.chat_uuid] = { id: lead.id, nome: lead.nome, temperatura: lead.temperatura || 'Morno', proximo_contato: lead.proximo_contato };
+                        leadsMap[lead.chat_uuid] = { id: lead.id, nome: lead.nome, temperatura: lead.temperatura || 'Morno', proximo_contato: lead.proximo_contato, status: lead.status };
                     }
                 });
                 setChatLeadsMap(prev => ({ ...prev, ...leadsMap }));
@@ -747,6 +750,14 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                             if (!leadTemp) return false;
                             return leadTemp.temperatura === filter.value;
                         
+                        case "conversao":
+                            const leadConv = getChatLead();
+                            if (filter.value === "convertido") {
+                                return leadConv?.status === "convertido";
+                            } else {
+                                return !leadConv || leadConv.status !== "convertido";
+                            }
+                        
                         default:
                             return true;
                     }
@@ -860,6 +871,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                   // Verifica se tem lead (usa telefone limpo para match)
                   const chatPhone = (chat.phone || chat.id.split('@')[0]).replace(/\D/g, '')
                   const chatLead = chatLeadsMap[chatPhone] || chatLeadsMap[chat.uuid || ''] || null
+                  const isConverted = chatLead?.status === "convertido"
 
                   return (
                     <ContextMenu key={chat.id}>
@@ -870,7 +882,9 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                             "w-full flex items-center gap-3 px-3 py-3 transition-all duration-200 text-left",
                             selectedChatId === chat.id
                               ? "bg-primary/15 border-l-4 border-primary hover:bg-primary/20 animate-border-slide"
-                              : "hover:bg-primary/10"
+                              : isConverted
+                                ? "bg-green-100 dark:bg-green-900/40 border-l-4 border-green-600 hover:bg-green-200 dark:hover:bg-green-900/60"
+                                : "hover:bg-primary/10"
                             // Removido destaque visual para chats apenas com mensagem nova
                           )}
                         >
@@ -993,11 +1007,29 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                                     </Tooltip>
                                   </TooltipProvider>
                                 )}
+                                {/* 3.5. Badge de Convertido */}
+                                {isConverted && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Badge 
+                                          variant="secondary" 
+                                          className="text-xs px-1.5 h-6 flex items-center gap-1 flex-shrink-0 rounded-md border bg-green-100 border-green-300 text-green-700"
+                                        >
+                                          <CheckCircle className="w-3.5 h-3.5" />
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        <p>Lead Convertido</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
                                 {/* 4. Badge de atribuição (estilo moderno com cor do cargo) */}
                                 {assignment && (
                                   <ContextMenu>
                                     <ContextMenuTrigger asChild>
-                                      <div onClick={(e) => { e.stopPropagation(); onSelectChat(chat); }} className="flex-shrink-0">
+                                      <div onClick={(e) => { e.stopPropagation(); onSelectChat(chat); }} className="flex-shrink-0 relative z-20">
                                         <TooltipProvider>
                                           <Tooltip>
                                             <TooltipTrigger asChild>
@@ -1005,7 +1037,7 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                                                 variant="secondary" 
                                                 className="text-xs px-1.5 h-6 flex items-center gap-1 flex-shrink-0 cursor-pointer rounded-md border"
                                                 style={{ 
-                                                  backgroundColor: (assignment.assigned_to_color || '#6b7280') + '33',
+                                                  backgroundColor: `color-mix(in srgb, ${assignment.assigned_to_color || '#6b7280'} 20%, white)`,
                                                   borderColor: assignment.assigned_to_color || '#6b7280',
                                                   color: assignment.assigned_to_color || '#6b7280'
                                                 }}
@@ -1186,6 +1218,17 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
                           Editar nome
                         </ContextMenuItem>
 
+                        {/* Ver histórico */}
+                        <ContextMenuItem 
+                          onClick={() => {
+                            setContextMenuChat(chat)
+                            setShowHistoryDialog(true)
+                          }}
+                        >
+                          <History className="w-4 h-4 mr-2" />
+                          Ver histórico
+                        </ContextMenuItem>
+
                         <ContextMenuSeparator />
 
                         {/* Novo Lead / Ver Lead */}
@@ -1316,6 +1359,19 @@ const ChatList = forwardRef<ChatListHandle, ChatListProps>(
             }}
             imageUrl={profilePictureChat.url}
             name={profilePictureChat.name}
+          />
+        )}
+
+        {/* Modal de histórico */}
+        {contextMenuChat && (
+          <ChatHistoryDialog
+            open={showHistoryDialog}
+            onOpenChange={(open) => {
+              setShowHistoryDialog(open)
+              if (!open) setContextMenuChat(null)
+            }}
+            chatId={contextMenuChat.id}
+            chatName={contextMenuChat.name || contextMenuChat.phone || contextMenuChat.id}
           />
         )}
       </div>

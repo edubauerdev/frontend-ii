@@ -153,37 +153,70 @@
 *::after,
 html,
 body {
-  cursor: url('/cursor.svg') 2 2, auto !important;
+  cursor: url('/cursor.svg') 2 2, auto;
 }
 
 /* Cursor pointer (mão) para elementos clicáveis */
 a,
 a *,
 a svg,
+a span,
 button,
 button *,
 button svg,
+button span,
+button p,
+button div,
 input[type="button"],
 input[type="submit"],
 input[type="reset"],
 input[type="checkbox"],
 input[type="radio"],
 select,
+select *,
 summary,
+summary *,
 label,
+label *,
 [role="button"],
 [role="button"] *,
 [role="button"] svg,
+[role="button"] span,
 [role="menuitem"],
+[role="menuitem"] *,
+[role="menuitem"] svg,
+[role="menuitem"] span,
+[role="menuitem"] p,
+[role="menuitemcheckbox"],
+[role="menuitemcheckbox"] *,
+[role="menuitemradio"],
+[role="menuitemradio"] *,
 [role="option"],
+[role="option"] *,
 [role="tab"],
+[role="tab"] *,
 [role="checkbox"],
+[role="checkbox"] *,
 [role="switch"],
+[role="switch"] *,
 [role="link"],
+[role="link"] *,
+[role="combobox"],
+[role="combobox"] *,
+[role="listbox"],
+[role="listbox"] *,
 [tabindex]:not([tabindex="-1"]),
+[tabindex]:not([tabindex="-1"]) *,
 [data-radix-collection-item],
+[data-radix-collection-item] *,
+[data-state="open"],
+[data-state="open"] *,
+[data-state="checked"],
+[data-state="checked"] *,
 .cursor-pointer,
+.cursor-pointer *,
 .clickable,
+.clickable *,
 .lead-card,
 .lead-card *,
 nav a,
@@ -340,5 +373,17 @@ p::selection,
 span::selection,
 div::selection,
 *::selection {
+  cursor: url('/select-text.svg') 8 8, text !important;
+}
+
+/* Garantir cursor de seleção de texto em qualquer seleção */
+body.selecting-text,
+body.selecting-text *,
+body.selecting-text *::before,
+body.selecting-text *::after {
+  cursor: url('/select-text.svg') 8 8, text !important;
+}
+
+*::selection, ::selection {
   cursor: url('/select-text.svg') 8 8, text !important;
 }

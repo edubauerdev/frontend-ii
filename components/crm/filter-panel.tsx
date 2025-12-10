@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Filter, Plus, X, User, Thermometer, Phone, Tag } from 'lucide-react'
+import { Filter, Plus, X, User, Thermometer, Phone, Tag, CheckCircle } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { getContrastTextColor } from "@/lib/utils"
 
 export interface FilterRule {
   id: string
-  type: "vendedor" | "temperatura" | "acao" | "etiqueta" | ""
+  type: "vendedor" | "temperatura" | "acao" | "etiqueta" | "conversao" | ""
   value: string
 }
 
@@ -146,6 +146,12 @@ export function FilterPanel({ vendedores, acoes, etiquetas = [], onFiltersChange
                         </div>
                       </SelectItem>
                     )}
+                    <SelectItem value="conversao">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        Conversão
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -225,6 +231,31 @@ export function FilterPanel({ vendedores, acoes, etiquetas = [], onFiltersChange
                         <div className="flex items-center gap-2">
                           <Tag className="w-3 h-3 text-muted-foreground" />
                           <span className="text-muted-foreground">Sem etiqueta</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {filter.type === "conversao" && (
+                  <Select
+                    value={filter.value}
+                    onValueChange={(value) => handleFilterValueChange(filter.id, value)}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="convertido">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Convertido
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="nao_convertido">
+                        <div className="flex items-center gap-2">
+                          <X className="w-4 h-4 text-muted-foreground" />
+                          Não convertido
                         </div>
                       </SelectItem>
                     </SelectContent>

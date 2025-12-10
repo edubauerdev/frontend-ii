@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Filter, X, Plus, Tag, User, UserX, Flame, Coffee, Snowflake, Users } from "lucide-react"
+import { Filter, X, Plus, Tag, User, UserX, Flame, Coffee, Snowflake, Users, CheckCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { Etiqueta } from "@/lib/whatsapp-types"
 
-export type FilterType = "etiqueta" | "atribuicao" | "lead" | "temperatura"
+export type FilterType = "etiqueta" | "atribuicao" | "lead" | "temperatura" | "conversao"
 
 export interface ChatFilterRule {
   id: string
@@ -103,6 +103,8 @@ export function ChatFilterPanel({ filters, onFiltersChange }: ChatFilterPanelPro
           if (value === "Quente") label = "Quente"
           else if (value === "Morno") label = "Morno"
           else if (value === "Frio") label = "Frio"
+        } else if (f.type === "conversao") {
+          label = value === "convertido" ? "Convertido" : "Não convertido"
         }
         return { ...f, value, label }
       }
@@ -186,6 +188,12 @@ export function ChatFilterPanel({ filters, onFiltersChange }: ChatFilterPanelPro
                       <div className="flex items-center gap-2">
                         <Flame className="w-3 h-3" />
                         Temperatura
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="conversao">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-3 h-3" />
+                        Conversão
                       </div>
                     </SelectItem>
                   </SelectContent>
@@ -286,6 +294,31 @@ export function ChatFilterPanel({ filters, onFiltersChange }: ChatFilterPanelPro
                         <div className="flex items-center gap-2">
                           <Snowflake className="w-3 h-3 text-blue-500" />
                           Frio
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {filter.type === "conversao" && (
+                  <Select
+                    value={filter.value}
+                    onValueChange={(val) => updateFilterValue(filter.id, val)}
+                  >
+                    <SelectTrigger className="flex-1 h-8">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="convertido">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-3 h-3 text-green-500" />
+                          Convertido
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="nao_convertido">
+                        <div className="flex items-center gap-2">
+                          <X className="w-3 h-3 text-muted-foreground" />
+                          Não convertido
                         </div>
                       </SelectItem>
                     </SelectContent>

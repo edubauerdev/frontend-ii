@@ -709,6 +709,13 @@ export default function CRMPage() {
           const leadEtiquetas = chatEtiquetasMap[lead.chat_uuid] || []
           return leadEtiquetas.includes(filter.value)
         }
+        if (filter.type === "conversao") {
+          if (filter.value === "convertido") {
+            return lead.status === "convertido"
+          } else {
+            return lead.status !== "convertido"
+          }
+        }
         return true
       })
     })

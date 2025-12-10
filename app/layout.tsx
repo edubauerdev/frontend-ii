@@ -7,6 +7,7 @@ import { AuthGuard } from "@/components/auth-guard"
 import { RealtimeProvider } from "@/contexts/realtime-context"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
+import "./select-cursor"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })

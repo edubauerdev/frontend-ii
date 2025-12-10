@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Send, RefreshCw, Zap, Loader2, Paperclip, X, User, History, UserPlus, Plus, Tag, Pencil, Tags, StickyNote, Copy, Phone } from "lucide-react"
+import { Send, RefreshCw, Zap, Loader2, Paperclip, X, User, History, UserPlus, Plus, Tag, Pencil, Tags, StickyNote, Copy, Phone, FileText, CheckCircle } from "lucide-react"
 import { QuickRepliesPanel } from "./quick-replies-panel"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -139,7 +139,7 @@ export function ChatWindow({
   const userDataCache = useRef<Record<string, { nome: string | null; cargo: string | null; color: string | null }>>({})
 
   // Estado para lead existente
-  const [existingLead, setExistingLead] = useState<{ id: string; nome: string; proximo_contato: string | null; temperatura: string } | null>(null)
+  const [existingLead, setExistingLead] = useState<{ id: string; nome: string; proximo_contato: string | null; temperatura: string; status: string | null } | null>(null)
 
   // Estados locais para nome e etiquetas (atualizados via realtime)
   const [chatName, setChatName] = useState<string | null>(initialChatName || null)
@@ -190,7 +190,7 @@ export function ChatWindow({
   useEffect(() => {
     async function checkExistingLead() {
       try {
-        let query = supabase.from("leads").select("id, nome, proximo_contato, temperatura")
+        let query = supabase.from("leads").select("id, nome, proximo_contato, temperatura, status")
         
         if (chatUuid) {
           query = query.eq("chat_uuid", chatUuid)
@@ -203,7 +203,7 @@ export function ChatWindow({
         const { data } = await query.limit(1).single()
         
         if (data) {
-          setExistingLead({ ...data, temperatura: data.temperatura || 'Morno' })
+          setExistingLead({ ...data, temperatura: data.temperatura || 'Morno', status: data.status || null })
         } else {
           setExistingLead(null)
         }
@@ -243,7 +243,8 @@ export function ChatWindow({
                 id: newRecord.id,
                 nome: newRecord.nome,
                 proximo_contato: newRecord.proximo_contato,
-                temperatura: newRecord.temperatura || 'Morno'
+                temperatura: newRecord.temperatura || 'Morno',
+                status: newRecord.status || null
               })
             }
           } else if (payload.eventType === 'DELETE') {
@@ -856,7 +857,7 @@ export function ChatWindow({
                                 variant="secondary" 
                                 className="text-xs h-6 px-1.5 flex items-center gap-1 cursor-context-menu rounded-md border" 
                                 style={{ 
-                                  backgroundColor: roleColor + '33',
+                                  backgroundColor: `color-mix(in srgb, ${roleColor} 20%, white)`,
                                   borderColor: roleColor, 
                                   color: roleColor 
                                 }}
@@ -930,6 +931,25 @@ export function ChatWindow({
                       </TooltipTrigger>
                       <TooltipContent side="bottom">
                         <p>{existingLead.temperatura}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                
+                {/* 2.5. Badge de Convertido */}
+                {existingLead?.status === "convertido" && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge 
+                          variant="secondary" 
+                          className="text-xs px-1.5 h-6 flex items-center gap-1 rounded-md border bg-green-100 border-green-300 text-green-700"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p>Lead Convertido</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -1035,12 +1055,13 @@ export function ChatWindow({
                 
                 {/* 4. Badge de Notas */}
                 {hasNotes && (
-                  <NoteBadge 
-                    chatId={chatId} 
-                    chatName={safeChatName} 
-                    hasNote={hasNotes}
-                    noteContent={noteContent}
-                  />
+                  <Badge
+                    variant="secondary"
+                    className="text-xs px-1.5 h-6 flex items-center gap-1 flex-shrink-0 cursor-pointer rounded-md border bg-yellow-100 border-yellow-300 text-yellow-700"
+                    onClick={() => setShowNotesDialog(true)}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                  </Badge>
                 )}
               </div>
             </div>
